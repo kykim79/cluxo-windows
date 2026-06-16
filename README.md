@@ -36,8 +36,28 @@ dotnet test       # Cluxo.Core 단위 테스트
 
 추가 Core 타입: `PointD`/`RectD`/`Rgba`(+opacity 팩토리·needsDarkText), `Spring`/`Ease`/`FontToken`(Visuals), `KeyModifiers`/`SpecialKey`.
 
-**Cluxo.Core v1 순수 로직 + 디자인 토큰 이식 완료 — 154 tests green.** (GestureClassifier는 설계대로 제외: Windows에 raw 터치 입력원 없음.)
-다음 단계는 네이티브 계층(Input/Render/Shell)으로, Windows 실행 환경(Parallels VM/미니PC)이 필요.
+**Cluxo.Core v1 순수 로직 + 디자인 토큰 이식 완료 — 162 tests green.** (GestureClassifier는 설계대로 제외: Windows에 raw 터치 입력원 없음.)
+
+## 네이티브 계층 경계 (`Cluxo.Core.Platform`)
+
+Core(순수 로직)와 네이티브 Windows 구현 사이 계약. 네이티브가 구현, Core/코디네이터가 소비.
+
+```
+[후킹 스레드]                  [코디네이터]              [렌더 스레드 / vsync]
+IMouseHook(클릭·스크롤만) ─▶  Core 상태 갱신     ICursorPositionSource(이동=프레임 샘플)
+IKeyboardHook ───────────▶  (DrawingState,           │
+IHotkeyRegistrar ────────▶   ShakeState …)  ──▶ OverlayFrame(불변) ─▶ IOverlayRenderer
+IForegroundAppMonitor ───▶                            (모니터별 Direct2D)
+IClock.NowSeconds ───────▶
+Shell: ISettingsStore · IBrandingProvider · ILaunchAtLogin · ITrayIcon · IMonitorProvider
+```
+
+- **스레드 규약**: 입력 콜백 경량(WH_MOUSE_LL timeout 회피) → Core 갱신만. 렌더는 별 스레드에서 vsync마다 위치 샘플 + 불변 `OverlayFrame` 수신(공유 가변 상태 없음).
+- **하이브리드 입력**(설계 발견1): 이동은 후킹 안 함, 클릭/스크롤만 `IMouseHook`. 위치는 `ICursorPositionSource` 폴링.
+- **T2 critical gap**: `IMouseHook.HookRemoved` — 후킹 제거 감지 → 재설치 + 알림.
+- 인터페이스는 테스트 더블로 시ams 조립 검증(PlatformTests 8): Clock→ShakeState, MouseHook→DrawingState, OverlayFrame 전달.
+
+다음 단계는 이 인터페이스의 **네이티브 구현**(Input/Render/Shell)으로, Windows 실행 환경(Parallels VM/미니PC)이 필요.
 
 ## 선행 게이트 (코드 본투자 전)
 
