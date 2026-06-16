@@ -96,6 +96,61 @@ internal static class SelfTest
     private sealed class StubLaunch : ILaunchAtLogin { public bool IsEnabled { get; set; } }
 
     /// <summary>링 모양(원·둥근사각·마름모·육각) + 점선 렌더 → PNG.</summary>
+    /// <summary>그리기 툴바 렌더 → PNG. ToolbarVisual을 직접 구성해 패널·도구·두께·색을 검증.</summary>
+    public static int RunToolbar()
+    {
+        const int w = 720, h = 140;
+        var accent = new Rgba(0, 230, 255);
+        var tools = new[] { DrawingTool.Pen, DrawingTool.Line, DrawingTool.Arrow, DrawingTool.Rectangle,
+            DrawingTool.Ellipse, DrawingTool.Highlighter, DrawingTool.Badge };
+        const double toolD = 34, toolGap = 7, thickHit = 22, thickGap = 4, colorHit = 22, colorGap = 4, groupGap = 18, pad = 14;
+        var steps = new double[] { 2, 4, 6, 10, 14 };
+        var colors = new[] { RingColor.Yellow, RingColor.Red, RingColor.Blue, RingColor.Green, RingColor.Cyan, RingColor.Purple, RingColor.White };
+
+        double toolsW = tools.Length * toolD + (tools.Length - 1) * toolGap;
+        double thickW = steps.Length * thickHit + (steps.Length - 1) * thickGap;
+        double colorW = colors.Length * colorHit + (colors.Length - 1) * colorGap;
+        double panelW = toolsW + groupGap + thickW + groupGap + colorW + pad * 2;
+        double panelH = toolD + pad * 2;
+        double left = (w - panelW) / 2, top = (h - panelH) / 2 + 8, cy = top + panelH / 2, x = left + pad;
+
+        var toolItems = new List<ToolbarItem>();
+        foreach (var t in tools)
+        {
+            toolItems.Add(new ToolbarItem(new RectD(x, cy - toolD / 2, toolD, toolD), t == DrawingTool.Arrow, t == DrawingTool.Arrow, default, 0, t));
+            x += toolD + toolGap;
+        }
+        x += groupGap - toolGap;
+        var thickItems = new List<ToolbarItem>();
+        foreach (var sw in steps)
+        {
+            thickItems.Add(new ToolbarItem(new RectD(x, cy - thickHit / 2, thickHit, thickHit), sw == 6, sw == 6, default, sw, default));
+            x += thickHit + thickGap;
+        }
+        x += groupGap - thickGap;
+        var colorItems = new List<ToolbarItem>();
+        foreach (var c in colors)
+        {
+            colorItems.Add(new ToolbarItem(new RectD(x, cy - colorHit / 2, colorHit, colorHit), c == RingColor.Cyan, c == RingColor.Cyan, c.Color(), 0, default));
+            x += colorHit + colorGap;
+        }
+        var tb = new ToolbarVisual(new RectD(left, top, panelW, panelH), accent,
+            "화살표 · 드래그하여 그리기 · ESC 종료", toolItems, thickItems, colorItems);
+
+        var mon = new MonitorInfo("M", new RectD(0, 0, w, h), 1.0, true);
+        var el = new OverlayElement(mon, () => 0.0) { Width = w, Height = h };
+        el.SetFrame(new OverlayFrame("M", null, null, Array.Empty<DrawingShape>(), BrandingConfig.Default, OverlayEffects.Empty, Toolbar: tb));
+
+        var canvas = new Canvas { Width = w, Height = h, Background = new SolidColorBrush(Color.FromRgb(40, 40, 48)) };
+        canvas.Children.Add(el);
+        canvas.Measure(new Size(w, h)); canvas.Arrange(new Rect(0, 0, w, h)); canvas.UpdateLayout();
+        var rtb = new RenderTargetBitmap(w, h, 96, 96, PixelFormats.Pbgra32);
+        rtb.Render(canvas);
+        var enc = new PngBitmapEncoder(); enc.Frames.Add(BitmapFrame.Create(rtb));
+        using (var fs = File.Create(Path.Combine(Path.GetTempPath(), "cluxo-selftest-toolbar.png"))) enc.Save(fs);
+        return 0;
+    }
+
     public static int RunRings()
     {
         const int cell = 130, h = 190;

@@ -277,11 +277,24 @@ public sealed class OverlayCoordinator : IDisposable
             }
         }
 
+        // 그리기 툴바 — 활성 시 커서 모니터(없으면 첫 모니터) 하단 중앙에 1회 레이아웃.
+        // DrawingState 프레임(히트테스트)과 ToolbarVisual(렌더)을 동시에 채운다.
+        ToolbarVisual? toolbar = null;
+        if (_drawing.IsDrawingModeActive)
+        {
+            var tbMon = MonitorContaining(pos) ?? _monitors.Monitors.FirstOrDefault();
+            if (tbMon.Id is not null) toolbar = BuildToolbar(tbMon);
+        }
+
         foreach (var monitor in _monitors.Monitors)
         {
             if (!_renderers.TryGetValue(monitor.Id, out var renderer)) continue;
             var b = monitor.Bounds;
             PointD? cursorHere = b.Contains(pos) ? pos : null;
+            // 툴바는 자기 경계 안에 중심이 있는 모니터만 렌더
+            ToolbarVisual? toolbarHere = toolbar is { } tvb
+                && b.Contains(new PointD(tvb.Bounds.X + tvb.Bounds.Width / 2, tvb.Bounds.Y + tvb.Bounds.Height / 2))
+                ? toolbar : null;
             // 링 외형 — CursorSettings 캐시(색·크기·투명도) + 이중링/채우기 + 드래그 속도 stretch.
             // #16 Velocity Stretch(맥): 진행 방향으로 회전 후 x 1.05→1.5 / y 0.95→0.7 비대칭 스케일.
             double sx = 1.0, sy = 1.0, sAngle = 0.0;
@@ -318,9 +331,77 @@ public sealed class OverlayCoordinator : IDisposable
                     radialValues, radialSubActive, radialSubSubActive)
                 : null;
             result.Add((renderer, new OverlayFrame(monitor.Id, cursorHere, ring, shapes, branding, effects, keystroke, drag, radial,
-                _runtime.IsInspectorActive)));
+                _runtime.IsInspectorActive, toolbarHere)));
         }
         return result;
+    }
+
+    // 도구 표시 순서 (맥 DrawingToolbarView와 동일): 펜·직선·화살표·사각형·타원·형광펜·뱃지.
+    private static readonly DrawingTool[] ToolbarOrder =
+    {
+        DrawingTool.Pen, DrawingTool.Line, DrawingTool.Arrow, DrawingTool.Rectangle,
+        DrawingTool.Ellipse, DrawingTool.Highlighter, DrawingTool.Badge,
+    };
+
+    // 그리기 툴바 레이아웃 — 화면(가상 데스크톱) 좌표로 계산. DrawingState 프레임(히트테스트)과
+    // ToolbarVisual(렌더)을 동시에 채운다. mon 하단 중앙 배치. (맥 DrawingToolbarView 대응)
+    private ToolbarVisual BuildToolbar(MonitorInfo mon)
+    {
+        const double pad = 14, toolD = 34, toolGap = 7, thickHit = 22, thickGap = 4,
+                     colorHit = 22, colorGap = 4, groupGap = 18, bottomMargin = 110;
+        var steps = Tokens.Drawing.LineWidthSteps;
+        var colors = ColorPalette;
+
+        double toolsW = ToolbarOrder.Length * toolD + (ToolbarOrder.Length - 1) * toolGap;
+        double thickW = steps.Length * thickHit + (steps.Length - 1) * thickGap;
+        double colorW = colors.Length * colorHit + (colors.Length - 1) * colorGap;
+        double panelW = toolsW + groupGap + thickW + groupGap + colorW + pad * 2;
+        double panelH = toolD + pad * 2;
+
+        double left = mon.Bounds.X + (mon.Bounds.Width - panelW) / 2;
+        double top = mon.Bounds.Y + mon.Bounds.Height - bottomMargin - panelH;
+        var bounds = new RectD(left, top, panelW, panelH);
+        double cy = top + panelH / 2;
+        double x = left + pad;
+
+        var preview = _drawing.PreviewTool;
+        _drawing.ToolbarFrames.Clear();
+        var toolItems = new List<ToolbarItem>(ToolbarOrder.Length);
+        foreach (var t in ToolbarOrder)
+        {
+            var rect = new RectD(x, cy - toolD / 2, toolD, toolD);
+            _drawing.ToolbarFrames[t] = rect;
+            toolItems.Add(new ToolbarItem(rect, t == preview, t == _drawing.SelectedTool, default, 0, t));
+            x += toolD + toolGap;
+        }
+        x += groupGap - toolGap;
+
+        _drawing.ThicknessFrames.Clear();
+        var thickItems = new List<ToolbarItem>(steps.Length);
+        foreach (var w in steps)
+        {
+            var rect = new RectD(x, cy - thickHit / 2, thickHit, thickHit);
+            _drawing.ThicknessFrames[w] = rect;
+            bool sel = Math.Abs(w - _drawing.LineWidth) < 0.01;
+            thickItems.Add(new ToolbarItem(rect, sel, sel, default, w, default));
+            x += thickHit + thickGap;
+        }
+        x += groupGap - thickGap;
+
+        _drawing.ColorFrames.Clear();
+        var colorItems = new List<ToolbarItem>(colors.Length);
+        var curColor = _settingsModel.RingColor;
+        foreach (var c in colors)
+        {
+            var rect = new RectD(x, cy - colorHit / 2, colorHit, colorHit);
+            _drawing.ColorFrames[c.ToString()] = rect;
+            bool sel = c == curColor;
+            colorItems.Add(new ToolbarItem(rect, sel, sel, c.Color(), 0, default));
+            x += colorHit + colorGap;
+        }
+
+        string hint = $"{preview.DisplayName()} · 드래그하여 그리기 · ESC 종료";
+        return new ToolbarVisual(bounds, _activeColor, hint, toolItems, thickItems, colorItems);
     }
 
     // 커밋된 도형 + (그리기 중이면) 진행 중 stroke를 불변 스냅샷으로. 진행 중 stroke를 포함해
@@ -438,14 +519,41 @@ public sealed class OverlayCoordinator : IDisposable
                 return;
             }
 
-            if (_runtime.IsRadialMenuActive) return; // 라디얼 중 좌/우 클릭 무시
+            // 라디얼 열림 중 — 좌클릭으로도 탐색/커밋(가운데와 동일). 가운데로 열고 좌클릭으로 선택·닫기가
+            // 자연스럽다. leaf=실행+유지, 중앙 ✕/바깥=닫기. 좌·우 클릭은 후킹이 흡수해 아래 창에 안 샌다.
+            if (_runtime.IsRadialMenuActive)
+            {
+                if (button == MouseButton.Left)
+                {
+                    _radial.Update(point, now);
+                    if (!_radial.Commit())
+                    {
+                        _radial.Close();
+                        _radialByMiddle = false;
+                    }
+                }
+                return; // 라디얼 중 클릭은 드래그/효과 억제
+            }
 
             if (button == MouseButton.Left) _leftDown = true;
 
             if (_drawing.IsDrawingModeActive)
             {
                 if (button == MouseButton.Left)
-                    _drawing.StartShape(point, _modifiers, _activeColor); // stroke도 accent 따름(DESIGN.md)
+                {
+                    // 툴바 클릭이면 도구/두께/색 선택만(도형 시작 안 함). 그 외 영역은 그리기 시작.
+                    if (_drawing.HitToolbarAndSelect(point))
+                        _keystrokes.ShowStatusNotification($"도구 · {_drawing.SelectedTool.DisplayName()}", now);
+                    else if (_drawing.HitThicknessAndSelect(point))
+                        _keystrokes.ShowStatusNotification($"두께 · {(int)_drawing.LineWidth}pt", now);
+                    else if (_drawing.ColorAt(point) is { } cn && Enum.TryParse<RingColor>(cn, out var rc))
+                    {
+                        _settingsModel.RingColor = rc;
+                        _keystrokes.ShowStatusNotification($"색 · {rc.Label()}", now);
+                    }
+                    else
+                        _drawing.StartShape(point, _modifiers, _activeColor); // stroke도 accent 따름(DESIGN.md)
+                }
                 return; // 그리기 모드 — 클릭 효과 억제
             }
 

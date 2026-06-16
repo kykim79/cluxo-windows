@@ -99,6 +99,7 @@ internal sealed class OverlayElement : FrameworkElement
         DrawRadial(dc, f, accent);
 
         DrawInspector(dc, f, accent);
+        DrawToolbar(dc, f);
         DrawKeystroke(dc, f);
         DrawBranding(dc, f);
     }
@@ -242,6 +243,103 @@ internal sealed class OverlayElement : FrameworkElement
     private static Geometry FrozenRoundedRect(Point c, double r, double cr)
     {
         var g = new RectangleGeometry(new Rect(c.X - r, c.Y - r, r * 2, r * 2), cr, cr); g.Freeze(); return g;
+    }
+
+    private Rect ToLocalRect(RectD r)
+    {
+        var tl = ToLocal(new PointD(r.X, r.Y));
+        double s = _monitor.DpiScale <= 0 ? 1.0 : _monitor.DpiScale;
+        return new Rect(tl.X, tl.Y, r.Width / s, r.Height / s);
+    }
+
+    // ── 그리기 모드 플로팅 툴바 (맥 DrawingToolbarView 대응) ─────
+    private void DrawToolbar(DrawingContext dc, OverlayFrame f)
+    {
+        if (f.Toolbar is not { } tb) return;
+        var bounds = ToLocalRect(tb.Bounds);
+        var accent = tb.Accent;
+
+        // 패널 — 어두운 반투명 + 옅은 외곽선 + 그림자.
+        var panelBrush = MakeBrush(Tokens.Surface.Panel, 0.94);
+        var border = new Pen(MakeBrush(Rgba.FromWhite(0.18), 1.0), 0.8);
+        dc.DrawRoundedRectangle(panelBrush, border, bounds, 14, 14);
+
+        // 도구 버튼 — 원 배경 + (활성/선택) accent ring + glyph.
+        foreach (var it in tb.Tools)
+        {
+            var rc = ToLocalRect(it.Rect);
+            var ctr = new Point(rc.X + rc.Width / 2, rc.Y + rc.Height / 2);
+            double rad = rc.Width / 2;
+            dc.DrawEllipse(MakeBrush(Rgba.FromWhite(it.Active ? 0.18 : 0.08), 1.0), null, ctr, rad, rad);
+            if (it.Active) dc.DrawEllipse(null, new Pen(MakeBrush(accent, 1.0), 2.0), ctr, rad, rad);
+            else if (it.Selected) dc.DrawEllipse(null, new Pen(MakeBrush(accent, 0.45), 1.0), ctr, rad, rad);
+            DrawToolGlyph(dc, it.Tool, ctr, rad * 0.82, accent);
+        }
+
+        // 두께 dot — 두께 비례 크기, 선택 시 accent ring.
+        foreach (var it in tb.Thickness)
+        {
+            var rc = ToLocalRect(it.Rect);
+            var ctr = new Point(rc.X + rc.Width / 2, rc.Y + rc.Height / 2);
+            double dot = it.Value * 0.6 + 4;
+            dc.DrawEllipse(MakeBrush(Rgba.FromWhite(it.Selected ? 0.9 : 0.35), 1.0), null, ctr, dot / 2, dot / 2);
+            if (it.Selected) dc.DrawEllipse(null, new Pen(MakeBrush(accent, 0.7), 1.5), ctr, rc.Width / 2 - 2, rc.Height / 2 - 2);
+        }
+
+        // 색 dot — 채운 원, 선택 시 흰 ring.
+        foreach (var it in tb.Colors)
+        {
+            var rc = ToLocalRect(it.Rect);
+            var ctr = new Point(rc.X + rc.Width / 2, rc.Y + rc.Height / 2);
+            dc.DrawEllipse(MakeBrush(it.Color, 1.0), null, ctr, 7, 7);
+            if (it.Selected) dc.DrawEllipse(null, new Pen(MakeBrush(Rgba.FromWhite(0.95), 1.0), 2.0), ctr, 10, 10);
+        }
+
+        // 힌트 — 패널 위 중앙에 현재 도구/조작 안내.
+        var ppd = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+        var ft = new FormattedText(tb.Hint, CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
+            new Typeface("Segoe UI"), 12, MakeBrush(Rgba.FromWhite(0.75), 1.0), ppd);
+        dc.DrawText(ft, new Point(bounds.X + (bounds.Width - ft.Width) / 2, bounds.Y - ft.Height - 6));
+    }
+
+    // 도구 glyph — 간단한 벡터(맥 SF Symbol 대응). 펜·직선·화살표·사각형·타원·형광펜·뱃지.
+    private void DrawToolGlyph(DrawingContext dc, DrawingTool tool, Point c, double s, Rgba accent)
+    {
+        var white = MakeBrush(Rgba.FromWhite(0.95), 1.0);
+        var pen = new Pen(white, 1.8) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round, LineJoin = PenLineJoin.Round };
+        double h = s * 0.55;
+        switch (tool)
+        {
+            case DrawingTool.Pen: // 펜촉 — 대각선 + 끝 점
+                dc.DrawLine(pen, new Point(c.X - h, c.Y + h), new Point(c.X + h * 0.6, c.Y - h * 0.8));
+                dc.DrawEllipse(white, null, new Point(c.X - h, c.Y + h), 1.6, 1.6);
+                break;
+            case DrawingTool.Line:
+                dc.DrawLine(pen, new Point(c.X - h, c.Y + h), new Point(c.X + h, c.Y - h));
+                break;
+            case DrawingTool.Arrow:
+                dc.DrawLine(pen, new Point(c.X - h, c.Y + h), new Point(c.X + h, c.Y - h));
+                dc.DrawLine(pen, new Point(c.X + h, c.Y - h), new Point(c.X + h * 0.2, c.Y - h));
+                dc.DrawLine(pen, new Point(c.X + h, c.Y - h), new Point(c.X + h, c.Y - h * 0.2));
+                break;
+            case DrawingTool.Rectangle:
+                dc.DrawRectangle(null, pen, new Rect(c.X - h, c.Y - h * 0.78, h * 2, h * 1.56));
+                break;
+            case DrawingTool.Ellipse:
+                dc.DrawEllipse(null, pen, c, h, h * 0.82);
+                break;
+            case DrawingTool.Highlighter: // 굵은 반투명 대각 바
+                var hp = new Pen(MakeBrush(accent, 0.55), s * 0.7) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round };
+                dc.DrawLine(hp, new Point(c.X - h, c.Y + h * 0.6), new Point(c.X + h, c.Y - h * 0.6));
+                break;
+            case DrawingTool.Badge: // 원 + "1"
+                dc.DrawEllipse(null, pen, c, h, h);
+                var ppd = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+                var ft = new FormattedText("1", CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
+                    new Typeface("Segoe UI"), s * 0.9, white, ppd);
+                dc.DrawText(ft, new Point(c.X - ft.Width / 2, c.Y - ft.Height / 2));
+                break;
+        }
     }
 
     private Pen RingPen(Rgba color, double width, double opacity, bool dashed)

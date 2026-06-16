@@ -42,6 +42,19 @@ public readonly record struct RadialVisual(
     IReadOnlyList<bool>? SubActive = null,
     IReadOnlyList<bool>? SubSubActive = null);
 
+/// <summary>그리기 툴바 한 항목 — 도구 버튼 / 두께 dot / 색 dot 공용. (맥 DrawingToolbarView 대응)</summary>
+public readonly record struct ToolbarItem(RectD Rect, bool Active, bool Selected, Rgba Color, double Value, DrawingTool Tool);
+
+/// <summary>
+/// 그리기 모드 플로팅 툴바 시각 상태 — 도구 7 + 두께 5 + 색 7. 좌표는 화면(가상 데스크톱).
+/// 코디네이터가 레이아웃을 계산해 DrawingState 프레임(히트테스트)과 동시에 채운다.
+/// </summary>
+public readonly record struct ToolbarVisual(
+    RectD Bounds, Rgba Accent, string Hint,
+    IReadOnlyList<ToolbarItem> Tools,
+    IReadOnlyList<ToolbarItem> Thickness,
+    IReadOnlyList<ToolbarItem> Colors);
+
 /// <summary>한 모니터의 일시적 효과 스냅샷 (해당 모니터 영역 효과만 필터됨).</summary>
 public readonly record struct OverlayEffects(
     IReadOnlyList<ClickEffect> Clicks,
@@ -74,7 +87,8 @@ public readonly record struct OverlayFrame(
     string? Keystroke = null,                // 키스트로크 오버레이 텍스트(보이는 동안만, 렌더가 배치)
     DragVisual? Drag = null,                 // 드래그 시각 힌트(커서 있는 모니터만)
     RadialVisual? Radial = null,             // 라디얼 메뉴(중심 있는 모니터만)
-    bool Inspector = false                   // ⌃⌥I 좌표 표시(커서 있는 모니터가 좌표 라벨 렌더)
+    bool Inspector = false,                  // ⌃⌥I 좌표 표시(커서 있는 모니터가 좌표 라벨 렌더)
+    ToolbarVisual? Toolbar = null            // 그리기 모드 플로팅 툴바(툴바 있는 모니터만)
 );
 
 /// <summary>

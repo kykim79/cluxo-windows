@@ -39,6 +39,11 @@ internal static class Program
             Environment.Exit(SelfTest.RunSettings());
             return;
         }
+        if (args.Length > 0 && args[0] == "--selftest-toolbar")
+        {
+            Environment.Exit(SelfTest.RunToolbar());
+            return;
+        }
         if (args.Length > 0 && args[0] == "--selftest-rings")
         {
             Environment.Exit(SelfTest.RunRings());
