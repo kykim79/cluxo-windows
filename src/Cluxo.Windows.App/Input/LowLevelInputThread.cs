@@ -54,6 +54,9 @@ internal sealed class LowLevelInputThread : IDisposable
     /// <summary>가운데 버튼을 앱에 전달하지 않고 흡수(Cluxo 라디얼 전용). 후킹 콜백에서 읽음.</summary>
     public volatile bool SuppressMiddleButton = true;
 
+    /// <summary>그리기/라디얼 모드 — 좌·우 버튼을 흡수해 아래 창/콘텐츠에 전달하지 않는다. 후킹 콜백에서 읽음.</summary>
+    public volatile bool CaptureMouseButtons;
+
     // 고수준 이벤트 (디스패치 스레드에서 발생)
     public event Action<MouseButton, PointD>? ButtonDown;
     public event Action<MouseButton, PointD>? ButtonUp;
@@ -156,10 +159,12 @@ internal sealed class LowLevelInputThread : IDisposable
             var pt = new PointD(ms.pt.X, ms.pt.Y);
             switch ((uint)wParam)
             {
-                case WM_LBUTTONDOWN: Enqueue(RawKind.ButtonDown, MouseButton.Left, pt); break;
-                case WM_LBUTTONUP: Enqueue(RawKind.ButtonUp, MouseButton.Left, pt); break;
-                case WM_RBUTTONDOWN: Enqueue(RawKind.ButtonDown, MouseButton.Right, pt); break;
-                case WM_RBUTTONUP: Enqueue(RawKind.ButtonUp, MouseButton.Right, pt); break;
+                // 그리기/라디얼 모드(CaptureMouseButtons)에선 L/R 클릭을 흡수해 아래 창·콘텐츠에
+                // 전달하지 않는다(맥 CGEventTap consume 대응). 평소엔 통과시켜 효과만 그린다.
+                case WM_LBUTTONDOWN: Enqueue(RawKind.ButtonDown, MouseButton.Left, pt); suppress = CaptureMouseButtons; break;
+                case WM_LBUTTONUP: Enqueue(RawKind.ButtonUp, MouseButton.Left, pt); suppress = CaptureMouseButtons; break;
+                case WM_RBUTTONDOWN: Enqueue(RawKind.ButtonDown, MouseButton.Right, pt); suppress = CaptureMouseButtons; break;
+                case WM_RBUTTONUP: Enqueue(RawKind.ButtonUp, MouseButton.Right, pt); suppress = CaptureMouseButtons; break;
                 // 가운데 버튼은 Cluxo 라디얼 전용 → 앱으로 보내지 않고 흡수(autoscroll·탭닫기 등 부작용 방지)
                 case WM_MBUTTONDOWN: Enqueue(RawKind.ButtonDown, MouseButton.Middle, pt); suppress = SuppressMiddleButton; break;
                 case WM_MBUTTONUP: Enqueue(RawKind.ButtonUp, MouseButton.Middle, pt); suppress = SuppressMiddleButton; break;

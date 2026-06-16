@@ -47,6 +47,13 @@ public sealed class Win32InputLayer : IDisposable
         set => _thread.SuppressMiddleButton = value;
     }
 
+    /// <summary>그리기/라디얼 모드 — 좌·우 버튼을 흡수해 아래 창에 전달하지 않음(렌더 루프가 매 프레임 동기화).</summary>
+    public bool CaptureMouseButtons
+    {
+        get => _thread.CaptureMouseButtons;
+        set => _thread.CaptureMouseButtons = value;
+    }
+
     public void Dispose()
     {
         if (_disposed) return;

@@ -118,7 +118,14 @@ internal static class Program
         coordinator.Start();
         overlay.StartRenderLoop(
             coordinator.RenderFrame,
-            capturesInput: () => coordinator.IsDrawingModeActive || coordinator.IsRadialMenuActive);
+            // 그리기/라디얼 모드: 오버레이 클릭통과를 끄고(창이 클릭 수신) + LL 훅이 좌·우 버튼을 흡수해
+            // 아래 창/콘텐츠로 새지 않게 한다. 매 프레임 평가되므로 두 경로가 항상 동기화.
+            capturesInput: () =>
+            {
+                bool c = coordinator.IsDrawingModeActive || coordinator.IsRadialMenuActive;
+                input.CaptureMouseButtons = c;
+                return c;
+            });
 
         // 테스트용 자동 종료 — 프로덕션 종료 경로를 그대로 타서 검증(--exit-after-ms N).
         using var autoExit = ScheduleAutoExit(args, exit);
