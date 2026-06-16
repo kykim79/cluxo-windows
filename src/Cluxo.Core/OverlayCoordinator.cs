@@ -32,6 +32,7 @@ public sealed class OverlayCoordinator : IDisposable
     private readonly DrawingState _drawing = new();
     private readonly ShakeState _shake = new();
     private readonly EffectsState _effects = new();
+    private readonly KeystrokeOverlayState _keystrokes = new();
     private readonly object _gate = new();
     private readonly Dictionary<string, IOverlayRenderer> _renderers = new();
     private readonly List<IDisposable> _hotkeyRegs = new();
@@ -45,7 +46,8 @@ public sealed class OverlayCoordinator : IDisposable
     // 더블클릭 감지 — 같은 위치 근처 0.4초 내 두 번째 좌클릭.
     private double _lastLeftDownTime = double.NegativeInfinity;
     private PointD _lastLeftDownPos;
-    private double _animationSpeed = 1.0; // CursorSettings 이식 시 그쪽에서
+    private double _animationSpeed = 1.0;   // CursorSettings 이식 시 그쪽에서
+    private double _keystrokeTimeout = 1.5;  // CursorSettings 이식 시 그쪽에서
 
     private const string LineWidthKey = "drawing.lineWidth";
     private const double DoubleClickWindow = 0.4;
@@ -60,6 +62,7 @@ public sealed class OverlayCoordinator : IDisposable
     public bool IsDrawingModeActive { get { lock (_gate) return _drawing.IsDrawingModeActive; } }
     public double LineWidth { get { lock (_gate) return _drawing.LineWidth; } }
     public IReadOnlyList<DrawingShape> DrawingShapes { get { lock (_gate) return _drawing.Shapes.ToArray(); } }
+    public string? Keystroke { get { lock (_gate) return _keystrokes.IsVisible ? _keystrokes.KeystrokeText : null; } }
 
     public OverlayCoordinator(
         IMouseHook mouse, IKeyboardHook keyboard, IHotkeyRegistrar hotkeys,
@@ -126,7 +129,8 @@ public sealed class OverlayCoordinator : IDisposable
                 if (_leftDown) _effects.UpdateDragTrail(pos); // 비-그리기 드래그(창 이동 등) streak
             }
 
-            _effects.Prune(now); // 만료 효과 + 드래그 trail fade 진행
+            _effects.Prune(now);   // 만료 효과 + 드래그 trail fade 진행
+            _keystrokes.Tick(now); // 키스트로크 오버레이 자동 숨김
             batch = BuildFrames(pos);
         }
 
@@ -139,6 +143,7 @@ public sealed class OverlayCoordinator : IDisposable
     {
         var branding = _branding.Current;
         var shapes = _drawing.Shapes.ToArray(); // 렌더 스레드가 가변 리스트 안 보게 스냅샷
+        string? keystroke = _keystrokes.IsVisible ? _keystrokes.KeystrokeText : null;
         var result = new List<(IOverlayRenderer, OverlayFrame)>(_renderers.Count);
 
         foreach (var monitor in _monitors.Monitors)
@@ -159,7 +164,7 @@ public sealed class OverlayCoordinator : IDisposable
                 _effects.IdlePulses.Where(e => b.Contains(e.Position)).ToArray(),
                 _effects.Trail.Where(e => b.Contains(e.Position)).ToArray(),
                 _effects.DragTrail.Where(e => b.Contains(e.Position)).ToArray());
-            result.Add((renderer, new OverlayFrame(monitor.Id, cursorHere, ring, shapes, branding, effects)));
+            result.Add((renderer, new OverlayFrame(monitor.Id, cursorHere, ring, shapes, branding, effects, keystroke)));
         }
         return result;
     }
@@ -181,7 +186,16 @@ public sealed class OverlayCoordinator : IDisposable
         return isDouble;
     }
 
-    private void ToggleDrawingMode() { lock (_gate) _drawing.ToggleMode(); }
+    private void ToggleDrawingMode()
+    {
+        double now = _clock.NowSeconds;
+        lock (_gate)
+        {
+            _drawing.ToggleMode();
+            _keystrokes.ShowStatusNotification(
+                _drawing.IsDrawingModeActive ? "그리기 모드 ON" : "그리기 모드 OFF", now);
+        }
+    }
 
     private void OnButtonDown(MouseButton button, PointD point)
     {
@@ -238,6 +252,7 @@ public sealed class OverlayCoordinator : IDisposable
 
     private void OnKeyPressed(KeyEvent e)
     {
+        double now = _clock.NowSeconds;
         lock (_gate)
         {
             _modifiers = e.Modifiers;
@@ -252,7 +267,11 @@ public sealed class OverlayCoordinator : IDisposable
                          && string.Equals(e.Characters, "z", StringComparison.OrdinalIgnoreCase))
                     _drawing.UndoLastShape();
             }
-            // TODO: 키스트로크 오버레이 — KeyFormat.Format(e.Modifiers, e.Special, e.Characters) → KeystrokeOverlayState
+
+            // 키스트로크 오버레이 — Format이 게이트(Ctrl/Alt/Win 필수)라 단순 타이핑은 "" 반환(표시 X)
+            string display = KeyFormat.Format(e.Modifiers, e.Special, e.Characters);
+            if (!string.IsNullOrEmpty(display))
+                _keystrokes.ShowKeystroke(display, _keystrokeTimeout, now);
         }
     }
 

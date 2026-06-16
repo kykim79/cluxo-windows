@@ -46,7 +46,8 @@ public readonly record struct OverlayFrame(
     RingVisual? Ring,
     IReadOnlyList<DrawingShape> Shapes,
     BrandingConfig Branding,                 // 코브랜딩(워터마크/스플래시 등 렌더에 필요)
-    OverlayEffects Effects = default         // 일시적 효과(모니터별 필터)
+    OverlayEffects Effects = default,        // 일시적 효과(모니터별 필터)
+    string? Keystroke = null                 // 키스트로크 오버레이 텍스트(보이는 동안만, 렌더가 배치)
 );
 
 /// <summary>

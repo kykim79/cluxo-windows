@@ -67,9 +67,10 @@ Core 상태 + 플랫폼 인터페이스를 배선하는 중앙 조정자 (Mac `A
 - **하이브리드 입력 행사**: 그리기 드래그 경로는 후킹이 아니라 `RenderFrame`의 프레임 샘플 위치를 따라간다.
 - 배선: ⌃⌥D 토글, 좌클릭 그리기 start/end, ESC clear, `[ ]` 두께+영구화, Ctrl+Z undo, 모니터 변경 시 렌더러 재구성, 후킹 분실(T2) → `MouseHookLost`, 종료 시 설정 flush.
 - **효과 배선**(EffectsState): 좌/우클릭 + 더블클릭 감지 → `AddClick`, 스크롤 → `AddScroll`(모니터 영역), 흔들기 감지 → `AddShake`, 매 프레임 트레일/드래그트레일 + `Prune(now)`. 그리기 모드에선 효과 억제. `OverlayFrame`에 모니터별 필터된 `OverlayEffects` 포함.
-- TODO(상태 이식 시 연결): 링 외형(CursorSettings), 키스트로크 오버레이, 발표앱 감지 동작, 정지펄스 트리거.
+- **키스트로크 배선**(KeystrokeOverlayState): `OnKeyPressed` → `KeyFormat.Format`(게이트로 단순 타이핑 제외) → `ShowKeystroke`, 그리기 토글 → `ShowStatusNotification`, `RenderFrame`에서 `Tick(now)` → `OverlayFrame.Keystroke`.
+- TODO(상태 이식 시 연결): 링 외형(CursorSettings), 발표앱 감지 동작, 정지펄스 트리거.
 
-**현재 198 tests green.** 다음 단계는 플랫폼 인터페이스의 **네이티브 구현**(Input/Render/Shell)으로, Windows 실행 환경(Parallels VM/미니PC)이 필요.
+**현재 202 tests green.** 다음 단계는 플랫폼 인터페이스의 **네이티브 구현**(Input/Render/Shell)으로, Windows 실행 환경(Parallels VM/미니PC)이 필요.
 
 ## 선행 게이트 (코드 본투자 전)
 

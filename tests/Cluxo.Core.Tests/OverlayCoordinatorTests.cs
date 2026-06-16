@@ -347,4 +347,52 @@ public class OverlayCoordinatorTests
         }
         Assert.NotEmpty(h.Factory.Created["A"].Last!.Value.Effects.Shakes);
     }
+
+    // ── 키스트로크 오버레이 배선 ─────────────────────────────────
+
+    [Fact]
+    public void KeyPressed_WithModifier_ShowsKeystroke()
+    {
+        var h = new Harness();
+        h.Coordinator.Start();
+        h.Keyboard.Press(new KeyEvent(KeyModifiers.Control, null, "c"));
+        h.Coordinator.RenderFrame();
+        Assert.Equal("Ctrl+C", h.Coordinator.Keystroke);
+        Assert.Equal("Ctrl+C", h.Factory.Created["A"].Last!.Value.Keystroke);
+    }
+
+    [Fact]
+    public void KeyPressed_NoModifier_NoKeystroke()
+    {
+        var h = new Harness();
+        h.Coordinator.Start();
+        h.Keyboard.Press(new KeyEvent(KeyModifiers.None, null, "a")); // 단순 타이핑 → 표시 X
+        h.Coordinator.RenderFrame();
+        Assert.Null(h.Coordinator.Keystroke);
+    }
+
+    [Fact]
+    public void DrawingToggle_ShowsStatusNotification()
+    {
+        var h = new Harness();
+        h.Coordinator.Start();
+        h.EnterDrawingMode();
+        h.Coordinator.RenderFrame();
+        Assert.Equal("그리기 모드 ON", h.Coordinator.Keystroke);
+    }
+
+    [Fact]
+    public void Keystroke_AutoHides_AfterTimeout()
+    {
+        var h = new Harness();
+        h.Coordinator.Start();
+        h.Clock.NowSeconds = 0;
+        h.Keyboard.Press(new KeyEvent(KeyModifiers.Control, null, "c"));
+        h.Coordinator.RenderFrame();
+        Assert.Equal("Ctrl+C", h.Coordinator.Keystroke);
+
+        h.Clock.NowSeconds = 1.5; // 기본 timeout 경과
+        h.Coordinator.RenderFrame();
+        Assert.Null(h.Coordinator.Keystroke);
+    }
 }
