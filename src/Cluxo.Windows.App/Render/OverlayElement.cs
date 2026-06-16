@@ -184,6 +184,14 @@ internal sealed class OverlayElement : FrameworkElement
         double r = ring.Radius * ring.Scale * _ringSpring.Value; // 클릭 squash 스프링(§5.2)
         var c = ToLocal(cursor);
 
+        // #16 드래그 속도 stretch — 진행 방향(StretchAngle)으로 회전 후 x/y 비대칭 스케일.
+        bool stretched = ring.StretchX != 1.0 || ring.StretchY != 1.0;
+        if (stretched)
+        {
+            dc.PushTransform(new RotateTransform(ring.StretchAngle, c.X, c.Y));
+            dc.PushTransform(new ScaleTransform(ring.StretchX, ring.StretchY, c.X, c.Y));
+        }
+
         // 글로우 — 커서 주위 은은한 후광(accent 라디얼 그라디언트). 링 외곽선 뒤에 그린다.
         if (ring.Glow)
         {
@@ -191,24 +199,49 @@ internal sealed class OverlayElement : FrameworkElement
             dc.DrawEllipse(GlowBrush(ring.Color, ring.Opacity), null, c, gr, gr);
         }
 
-        var pen = RingPen(ring.Color, ring.BorderWidth, ring.Opacity, ring.Dashed);
+        double innerR = r * 0.76; // 맥: innerSize = size * 0.76
 
-        switch (ring.Shape)
+        // 도넛 채우기 (맥 isRingFillEnabled, 기본 ON) — 안쪽~바깥 사이 반투명 채움.
+        if (ring.Fill)
         {
-            case RingShape.Squircle:
-                double cr = r * 0.45; // 둥근 모서리
-                dc.DrawRoundedRectangle(null, pen, new Rect(c.X - r, c.Y - r, r * 2, r * 2), cr, cr);
-                break;
-            case RingShape.Rhombus:
-                dc.DrawGeometry(null, pen, Polygon(c, r, 4)); // 4각(꼭짓점 위) = 마름모
-                break;
-            case RingShape.Hexagon:
-                dc.DrawGeometry(null, pen, Polygon(c, r, 6));
-                break;
-            default: // Circle
-                dc.DrawEllipse(null, pen, c, r, r);
-                break;
+            var donut = new GeometryGroup { FillRule = FillRule.EvenOdd };
+            donut.Children.Add(RingGeometry(c, r, ring.Shape));
+            donut.Children.Add(RingGeometry(c, innerR, ring.Shape));
+            donut.Freeze();
+            dc.DrawGeometry(MakeBrush(ring.Color, ring.Opacity * 0.18), null, donut);
         }
+
+        // 안쪽 링 (맥 hasInnerRing) — 0.76 크기, 0.55 두께, 0.32 투명도.
+        if (ring.InnerRing)
+        {
+            var innerPen = RingPen(ring.Color, ring.BorderWidth * 0.55, ring.Opacity * 0.32, false);
+            dc.DrawGeometry(null, innerPen, RingGeometry(c, innerR, ring.Shape));
+        }
+
+        // 바깥 링
+        var pen = RingPen(ring.Color, ring.BorderWidth, ring.Opacity, ring.Dashed);
+        dc.DrawGeometry(null, pen, RingGeometry(c, r, ring.Shape));
+
+        if (stretched) { dc.Pop(); dc.Pop(); }
+    }
+
+    // 링/효과 공용 외형 — 원·squircle·둥근 마름모·둥근 육각형(맥 anyShape 대응). 채우기·획에 모두 사용.
+    private static Geometry RingGeometry(Point c, double r, RingShape shape) => shape switch
+    {
+        RingShape.Squircle => FrozenRoundedRect(c, r, r * 0.56),       // 맥: 변(2r)의 28%
+        RingShape.Rhombus => RoundedPolygon(c, r, 4, 0.2),            // 둥근 마름모(cornerFraction 0.2)
+        RingShape.Hexagon => RoundedPolygon(c, r, 6, 0.28),           // 둥근 pointy-top 육각형(0.28)
+        _ => FrozenEllipse(c, r),                                      // Circle
+    };
+
+    private static Geometry FrozenEllipse(Point c, double r)
+    {
+        var g = new EllipseGeometry(c, r, r); g.Freeze(); return g;
+    }
+
+    private static Geometry FrozenRoundedRect(Point c, double r, double cr)
+    {
+        var g = new RectangleGeometry(new Rect(c.X - r, c.Y - r, r * 2, r * 2), cr, cr); g.Freeze(); return g;
     }
 
     private Pen RingPen(Rgba color, double width, double opacity, bool dashed)
@@ -241,19 +274,34 @@ internal sealed class OverlayElement : FrameworkElement
         return b;
     }
 
-    // 중심 기준 정n각형 외곽(첫 꼭짓점 위, 12시). 화면 좌표.
-    private static Geometry Polygon(Point center, double r, int n)
+    // 중심 기준 정n각형(첫 꼭짓점 위, 12시 pointy-top)을 모서리 라운딩한 닫힌 path.
+    // 맥 roundedPolygonPath 이식 — 각 꼭짓점을 control point로 한 quadratic curve로 부드럽게 깎는다.
+    // cornerFraction은 인접 꼭짓점까지 거리 대비 라운딩 비율(0~0.5).
+    private static Geometry RoundedPolygon(Point center, double r, int n, double cornerFraction)
     {
-        Point P(int i)
+        var v = new Point[n];
+        for (int i = 0; i < n; i++)
         {
             double a = (-90.0 + i * 360.0 / n) * Math.PI / 180.0;
-            return new Point(center.X + r * Math.Cos(a), center.Y + r * Math.Sin(a));
+            v[i] = new Point(center.X + r * Math.Cos(a), center.Y + r * Math.Sin(a));
         }
+        static Point Lerp(Point p, Point q, double t) => new(p.X + (q.X - p.X) * t, p.Y + (q.Y - p.Y) * t);
+
         var geo = new StreamGeometry();
         using (var ctx = geo.Open())
         {
-            ctx.BeginFigure(P(0), isFilled: false, isClosed: true);
-            for (int i = 1; i < n; i++) ctx.LineTo(P(i), isStroked: true, isSmoothJoin: false);
+            Point start0 = Lerp(v[0], v[n - 1], cornerFraction);
+            ctx.BeginFigure(start0, isFilled: true, isClosed: true);
+            for (int i = 0; i < n; i++)
+            {
+                Point curr = v[i];
+                Point prev = v[(i + n - 1) % n];
+                Point next = v[(i + 1) % n];
+                Point start = Lerp(curr, prev, cornerFraction);
+                Point end = Lerp(curr, next, cornerFraction);
+                if (i != 0) ctx.LineTo(start, isStroked: true, isSmoothJoin: false);
+                ctx.QuadraticBezierTo(curr, end, isStroked: true, isSmoothJoin: false);
+            }
         }
         geo.Freeze();
         return geo;

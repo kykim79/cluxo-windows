@@ -567,6 +567,44 @@ public class OverlayCoordinatorTests
     }
 
     [Fact]
+    public void Ring_InnerAndFill_FromSettings()
+    {
+        var h = new Harness();
+        h.Coordinator.Start();
+        h.Cursor.Position = new PointD(100, 100);
+        h.Coordinator.RenderFrame();
+        var ring = h.Factory.Created["A"].Last!.Value.Ring!.Value;
+        Assert.False(ring.InnerRing);  // 이중링 기본 OFF (맥과 동일)
+        Assert.True(ring.Fill);        // 링 채우기 기본 ON (맥과 동일)
+    }
+
+    [Fact]
+    public void Ring_Dragging_AppliesVelocityStretch()
+    {
+        var h = new Harness();
+        h.Coordinator.Start();
+        h.Clock.NowSeconds = 0;
+        h.Mouse.Down(MouseButton.Left, new PointD(0, 0)); // StartDrag
+        h.Cursor.Position = new PointD(200, 0); h.Clock.NowSeconds = 0.1;
+        h.Coordinator.RenderFrame();
+        var ring = h.Factory.Created["A"].Last!.Value.Ring!.Value;
+        Assert.True(ring.StretchX > 1.0); // 드래그 중 진행 방향으로 늘어남
+        Assert.True(ring.StretchY < 1.0); // 수직으로 줄어듦 (jelly squish)
+    }
+
+    [Fact]
+    public void Ring_NotDragging_NoStretch()
+    {
+        var h = new Harness();
+        h.Coordinator.Start();
+        h.Cursor.Position = new PointD(100, 100);
+        h.Coordinator.RenderFrame();
+        var ring = h.Factory.Created["A"].Last!.Value.Ring!.Value;
+        Assert.Equal(1.0, ring.StretchX);
+        Assert.Equal(1.0, ring.StretchY);
+    }
+
+    [Fact]
     public void DrawStroke_UsesEffectiveRingColor_FromSettings()
     {
         var h = new Harness();

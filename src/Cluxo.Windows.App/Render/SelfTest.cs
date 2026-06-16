@@ -99,24 +99,29 @@ internal static class SelfTest
     public static int RunRings()
     {
         const int cell = 130, h = 190;
-        var variants = new (RingShape shape, bool dashed, bool glow, string name)[]
+        var cyan = new Rgba(0, 230, 255);
+        // shape, dashed, glow, innerRing, fill, stretchX, stretchY, stretchAngle, name
+        var variants = new (RingShape shape, bool dashed, bool glow, bool inner, bool fill,
+            double sx, double sy, double sAng, string name)[]
         {
-            (RingShape.Circle, false, false, "원형"),
-            (RingShape.Squircle, false, false, "둥근 사각형"),
-            (RingShape.Rhombus, false, false, "마름모"),
-            (RingShape.Hexagon, false, false, "육각형"),
-            (RingShape.Circle, true, false, "점선"),
-            (RingShape.Circle, false, true, "글로우"),
+            (RingShape.Circle,   false, false, false, false, 1, 1, 0, "원형"),
+            (RingShape.Squircle, false, false, false, false, 1, 1, 0, "둥근 사각형"),
+            (RingShape.Rhombus,  false, false, false, false, 1, 1, 0, "둥근 마름모"),
+            (RingShape.Hexagon,  false, false, false, false, 1, 1, 0, "둥근 육각형"),
+            (RingShape.Circle,   false, false, true,  false, 1, 1, 0, "이중링"),
+            (RingShape.Circle,   false, false, false, true,  1, 1, 0, "채우기"),
+            (RingShape.Hexagon,  false, false, true,  true,  1, 1, 0, "이중+채우기"),
+            (RingShape.Circle,   false, true,  false, true,  1.45, 0.78, 35, "드래그 stretch"),
         };
         int w = cell * variants.Length;
         var canvas = new Canvas { Width = w, Height = h, Background = new SolidColorBrush(Color.FromRgb(32, 32, 38)) };
 
         for (int i = 0; i < variants.Length; i++)
         {
-            var (shape, dashed, glow, name) = variants[i];
+            var (shape, dashed, glow, inner, fill, sx, sy, sAng, name) = variants[i];
             var mon = new MonitorInfo("M", new RectD(i * cell, 0, cell, h), 1.0, true);
             var el = new OverlayElement(mon, () => 0.0) { Width = cell, Height = h };
-            var ring = new RingVisual(new Rgba(0, 230, 255), 42, 1.0, 1.0, shape, 4.0, dashed, glow);
+            var ring = new RingVisual(cyan, 42, 1.0, 1.0, shape, 4.0, dashed, glow, inner, fill, sx, sy, sAng);
             el.SetFrame(new OverlayFrame("M", new PointD(i * cell + cell / 2.0, 80), ring,
                 Array.Empty<DrawingShape>(), BrandingConfig.Default, OverlayEffects.Empty));
             Canvas.SetLeft(el, i * cell);

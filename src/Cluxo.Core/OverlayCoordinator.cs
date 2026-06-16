@@ -66,6 +66,8 @@ public sealed class OverlayCoordinator : IDisposable
     private RingShape _ringShape = RingShape.Circle;
     private double _ringBorderWidth = BorderWeight.Thin.LineWidth();
     private bool _ringDashed;
+    private bool _hasInnerRing;          // 이중링 (맥 hasInnerRing)
+    private bool _ringFillEnabled = true; // 도넛 채우기 (맥 isRingFillEnabled, 기본 ON)
     private double _animationSpeed = 1.0;
     private double _keystrokeTimeout = 3.0;
 
@@ -280,11 +282,21 @@ public sealed class OverlayCoordinator : IDisposable
             if (!_renderers.TryGetValue(monitor.Id, out var renderer)) continue;
             var b = monitor.Bounds;
             PointD? cursorHere = b.Contains(pos) ? pos : null;
-            // 링 외형 — CursorSettings 캐시(색·크기·투명도). Scale=1(런타임 모션은 이후 RingMotion 이식 시)
+            // 링 외형 — CursorSettings 캐시(색·크기·투명도) + 이중링/채우기 + 드래그 속도 stretch.
+            // #16 Velocity Stretch(맥): 진행 방향으로 회전 후 x 1.05→1.5 / y 0.95→0.7 비대칭 스케일.
+            double sx = 1.0, sy = 1.0, sAngle = 0.0;
+            if (cursorHere is not null && _runtime.IsDragging)
+            {
+                double vr = Math.Min(1.0, _runtime.DragVelocity / 1000.0);
+                sx = 1.05 + 0.45 * vr;
+                sy = 0.95 - 0.25 * vr;
+                sAngle = _runtime.DragAngle * 180.0 / Math.PI; // rad→deg (렌더는 화면 deg 회전)
+            }
             RingVisual? ring = cursorHere is null
                 ? null
                 : new RingVisual(_activeColor, _ringRadius, Scale: 1.0, _ringOpacity,
-                    _ringShape, _ringBorderWidth, _ringDashed, _glowEnabled);
+                    _ringShape, _ringBorderWidth, _ringDashed, _glowEnabled,
+                    _hasInnerRing, _ringFillEnabled, sx, sy, sAngle);
             // 효과는 이 모니터 영역 것만 (Mac의 per-screen 필터). TODO: 프레임당 Where/ToArray 최적화
             var effects = new OverlayEffects(
                 _effects.Clicks.Where(e => b.Contains(e.Position)).ToArray(),
@@ -344,6 +356,8 @@ public sealed class OverlayCoordinator : IDisposable
             _ringShape = _settingsModel.RingShape;
             _ringBorderWidth = _settingsModel.BorderWeight.LineWidth();
             _ringDashed = _settingsModel.BorderStyle == BorderStyle.Dashed;
+            _hasInnerRing = _settingsModel.HasInnerRing;
+            _ringFillEnabled = _settingsModel.IsRingFillEnabled;
             _animationSpeed = _settingsModel.AnimationSpeed.Multiplier();
             _keystrokeTimeout = _settingsModel.KeystrokeTimeout;
             _shake.RequiredDirChanges = _settingsModel.ShakeSensitivity.RequiredDirChanges();

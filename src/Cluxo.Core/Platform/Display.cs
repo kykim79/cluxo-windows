@@ -21,7 +21,9 @@ public interface IMonitorProvider
 /// </summary>
 public readonly record struct RingVisual(
     Rgba Color, double Radius, double Scale, double Opacity,
-    RingShape Shape = RingShape.Circle, double BorderWidth = 3.0, bool Dashed = false, bool Glow = false);
+    RingShape Shape = RingShape.Circle, double BorderWidth = 3.0, bool Dashed = false, bool Glow = false,
+    bool InnerRing = false, bool Fill = false,
+    double StretchX = 1.0, double StretchY = 1.0, double StretchAngle = 0.0);
 
 /// <summary>드래그 중 시각 힌트 — anchored line(#17)·speed glow(#14, Velocity)·드래그 각도 라벨용.
 /// ShowAngleLabel은 IsDragAngleLabelEnabled 설정 반영(각도 라벨 표시 여부).</summary>
