@@ -24,6 +24,11 @@ internal static class Program
             Environment.Exit(SelfTest.Run());
             return;
         }
+        if (args.Length > 0 && args[0] == "--selftest-fx")
+        {
+            Environment.Exit(SelfTest.RunFx());
+            return;
+        }
 
         using var input = new Win32InputLayer();
         using var shell = new Win32ShellLayer("Cluxo");

@@ -67,6 +67,58 @@ internal static class SelfTest
         return toggleOk ? 0 : 1;
     }
 
+    /// <summary>효과(트레일·스크롤·흔들기·더블클릭·클릭·링·드래그·라디얼·키스트로크·브랜딩) 렌더 → PNG.</summary>
+    public static int RunFx()
+    {
+        double now = 0;
+        var monitor = new MonitorInfo("M", new RectD(0, 0, 700, 400), 1.0, true);
+        var el = new OverlayElement(monitor, () => now);
+        el.SetFrame(BuildFxFrame());
+
+        var border = new Border { Width = 700, Height = 400, Background = new SolidColorBrush(Color.FromRgb(35, 35, 40)), Child = el };
+        border.Measure(new Size(700, 400));
+        border.Arrange(new Rect(0, 0, 700, 400));
+        border.UpdateLayout();
+
+        var rtb = new RenderTargetBitmap(700, 400, 96, 96, PixelFormats.Pbgra32);
+        // 1차 렌더로 효과 firstSeen을 now=0에 고정, 2차에서 now=0.4 → 중간 애니메이션(progress≈0.5) 캡처.
+        now = 0.0; el.SetFrame(BuildFxFrame()); rtb.Render(border);
+        now = 0.4; el.SetFrame(BuildFxFrame()); rtb.Render(border);
+
+        string png = Path.Combine(Path.GetTempPath(), "cluxo-selftest-fx.png");
+        var enc = new PngBitmapEncoder();
+        enc.Frames.Add(BitmapFrame.Create(rtb));
+        using (var fs = File.Create(png)) enc.Save(fs);
+        File.WriteAllText(Path.Combine(Path.GetTempPath(), "cluxo-selftest-fx.txt"), $"png={png}\n");
+        return 0;
+    }
+
+    private static OverlayFrame BuildFxFrame()
+    {
+        var accent = new Rgba(0, 230, 255);
+        var ring = new RingVisual(accent, 27, 1.0, 1.0);
+
+        var trail = new List<TrailPoint>();
+        for (int i = 0; i < 12; i++)
+            trail.Add(new TrailPoint(100 + i, new PointD(60 + i * 14, 210 - Math.Sin(i * 0.5) * 18)));
+
+        var effects = new OverlayEffects(
+            Clicks: new[] { new ClickEffect(1, new PointD(250, 110), false, false, 0.8) },
+            DoubleClicks: new[] { new DoubleClickEffect(2, new PointD(380, 110), 0.8) },
+            Scrolls: new[] { new ScrollEffect(3, new PointD(630, 120), true, true, 3, 0.8) },
+            Shakes: new[] { new ShakeEffect(4, new PointD(510, 110), 0.8) },
+            IdlePulses: Array.Empty<IdlePulseEffect>(),
+            Trail: trail,
+            DragTrail: Array.Empty<TrailPoint>());
+
+        var drag = new DragVisual(new PointD(300, 250), new PointD(440, 300), AnchoredLineVisible: true, Velocity: 800, Angle: 0.3);
+        var radial = new RadialVisual(Visible: true, Center: new PointD(560, 300), Sector: 0, Sub: null, SubSub: null);
+        var branding = new BrandingConfig { CompanyName = "Acme Corp", AccentColor = new Rgba(255, 150, 40) };
+
+        return new OverlayFrame("M", new PointD(120, 110), ring, Array.Empty<DrawingShape>(),
+            branding, effects, "Ctrl+Alt+D", drag, radial);
+    }
+
     private static OverlayFrame BuildShapeFrame()
     {
         var shapes = new List<DrawingShape>();

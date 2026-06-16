@@ -10,17 +10,18 @@ namespace Cluxo.Windows.App.Render;
 /// 한 모니터 오버레이의 WPF 그리기 표면. 불변 <see cref="OverlayFrame"/>을 받아 OnRender에서 그린다.
 /// 좌표는 물리 픽셀(가상 데스크톱) → 로컬 DIP 변환(OVERLAY-RENDER.md §4): local = (phys - origin)/dpiScale.
 ///
-/// 스톱갭 범위: 커서 링 + 클릭 ripple + 그리기 도형(pen·line·arrow·rect·ellipse·highlighter·badge).
-/// 트레일·스크롤·라디얼·키스트로크·브랜딩은 후속. 효과 progress는 효과 Id의 첫 등장 tick(§5.1).
-/// 진행 중 stroke는 코디네이터가 EndShape 후에만 프레임에 담으므로 커밋된 도형만 그린다.
+/// 그리는 요소(뒤→앞, §5): 트레일·드래그트레일·스크롤·흔들기·정지펄스·더블클릭·클릭 ripple ·
+/// 커서 링 · 드래그 힌트 · 그리기 도형 · 라디얼 메뉴 · 키스트로크 카드 · 코브랜딩 워터마크.
+///
+/// 효과 progress(§5.1): 모든 효과 Id는 EffectsState에서 전역 고유 → 첫 등장 tick(firstSeen)을 기록해
+/// progress = (now - firstSeen)/(ExpiresAt - firstSeen). 수명/animationSpeed를 몰라도 0→1 정확.
+/// 스톱갭(WPF) — D2D 교체 시 동일 OverlayFrame을 소비. 라디얼은 기본 wedge(라벨/sub는 후속).
 /// </summary>
 internal sealed class OverlayElement : FrameworkElement
 {
-    private const double ClickLife = 0.7; // EffectsState.ClickLife 미러
-
     private readonly MonitorInfo _monitor;
     private readonly Func<double> _clock;
-    private readonly Dictionary<int, double> _clickFirstSeen = new();
+    private readonly Dictionary<int, double> _firstSeen = new(); // 효과 Id → 첫 등장 tick
     private OverlayFrame? _frame;
     private double _now;
 
@@ -44,39 +45,110 @@ internal sealed class OverlayElement : FrameworkElement
         return new Point((p.X - _monitor.Bounds.X) / s, (p.Y - _monitor.Bounds.Y) / s);
     }
 
+    // firstSeen 기반 0→1 진행도. expiresAt까지의 비율.
+    private double Progress(int id, double expiresAt)
+    {
+        if (!_firstSeen.TryGetValue(id, out var t0)) { t0 = _now; _firstSeen[id] = t0; }
+        double denom = Math.Max(0.0001, expiresAt - t0);
+        return Math.Clamp((_now - t0) / denom, 0, 1);
+    }
+
     protected override void OnRender(DrawingContext dc)
     {
         if (_frame is not { } f) return;
+        var accent = f.Ring?.Color ?? new Rgba(0, 230, 255); // 커서 없는 모니터엔 기본 accent
 
-        DrawClicks(dc, f);     // 뒤 (퍼지는 ring)
-        DrawRing(dc, f);       // 커서 링
-        DrawShapes(dc, f);     // 앞 (annotation 도형)
+        PruneFirstSeen(f.Effects);
+
+        DrawTrail(dc, f.Effects.Trail, accent, 3, 0.5);       // 커서 모션 잔상
+        DrawTrail(dc, f.Effects.DragTrail, accent, 5, 0.7);   // 드래그 streak
+        DrawScrolls(dc, f.Effects.Scrolls, accent);
+        DrawExpandingRings(dc, f.Effects.Shakes.Select(e => (e.Id, e.Position, e.ExpiresAt)), accent, 22, 70, 4, 0.9);
+        DrawExpandingRings(dc, f.Effects.IdlePulses.Select(e => (e.Id, e.Position, e.ExpiresAt)), accent, 10, 44, 2, 0.5);
+        DrawExpandingRings(dc, f.Effects.DoubleClicks.Select(e => (e.Id, e.Position, e.ExpiresAt)), accent, 18, 64, 3, 0.8);
+        DrawClicks(dc, f.Effects.Clicks, accent);
+
+        DrawRing(dc, f);
+        DrawDrag(dc, f);
+        DrawShapes(dc, f);
+        DrawRadial(dc, f, accent);
+
+        DrawKeystroke(dc, f);
+        DrawBranding(dc, f);
+    }
+
+    private void PruneFirstSeen(OverlayEffects fx)
+    {
+        if (_firstSeen.Count == 0) return;
+        var live = new HashSet<int>();
+        foreach (var e in fx.Clicks) live.Add(e.Id);
+        foreach (var e in fx.DoubleClicks) live.Add(e.Id);
+        foreach (var e in fx.Scrolls) live.Add(e.Id);
+        foreach (var e in fx.Shakes) live.Add(e.Id);
+        foreach (var e in fx.IdlePulses) live.Add(e.Id);
+        if (_firstSeen.Count > live.Count)
+            foreach (var id in _firstSeen.Keys.Where(id => !live.Contains(id)).ToList())
+                _firstSeen.Remove(id);
+    }
+
+    // ── 트레일 (fade 폴리라인, 끝=최신이 진함) ──────────────────
+    private void DrawTrail(DrawingContext dc, IReadOnlyList<TrailPoint> pts, Rgba color, double width, double maxAlpha)
+    {
+        if (pts is null || pts.Count < 2) return;
+        for (int i = 1; i < pts.Count; i++)
+        {
+            double a = maxAlpha * (i / (double)(pts.Count - 1)); // 오래된 점일수록 옅게
+            dc.DrawLine(StrokePen(color, width, a), ToLocal(pts[i - 1].Position), ToLocal(pts[i].Position));
+        }
+    }
+
+    // ── 스크롤 방향 화살표 ──────────────────────────────────────
+    private void DrawScrolls(DrawingContext dc, IReadOnlyList<ScrollEffect> scrolls, Rgba color)
+    {
+        foreach (var s in scrolls)
+        {
+            double p = Progress(s.Id, s.ExpiresAt);
+            double alpha = 1 - p;
+            double len = 16 + Math.Min(20, s.Magnitude * 4);
+            var c = ToLocal(s.Position);
+            // 방향 단위벡터(화면 좌표, y 아래로 +)
+            double dx = s.IsVertical ? 0 : (s.IsPositive ? 1 : -1);
+            double dy = s.IsVertical ? (s.IsPositive ? -1 : 1) : 0; // 세로 +는 위로(forward)
+            var tip = new Point(c.X + dx * len, c.Y + dy * len);
+            var tail = new Point(c.X - dx * len, c.Y - dy * len);
+            var pen = StrokePen(color, 3, alpha);
+            dc.DrawLine(pen, tail, tip);
+            // 화살촉
+            double theta = Math.Atan2(tip.Y - tail.Y, tip.X - tail.X);
+            double hl = 9, ha = Math.PI / 6;
+            dc.DrawLine(pen, tip, new Point(tip.X - hl * Math.Cos(theta - ha), tip.Y - hl * Math.Sin(theta - ha)));
+            dc.DrawLine(pen, tip, new Point(tip.X - hl * Math.Cos(theta + ha), tip.Y - hl * Math.Sin(theta + ha)));
+        }
+    }
+
+    // ── 퍼지는 ring (흔들기/정지펄스/더블클릭 공용) ─────────────
+    private void DrawExpandingRings(DrawingContext dc, IEnumerable<(int Id, PointD Pos, double ExpiresAt)> items,
+        Rgba color, double r0, double r1, double width, double maxAlpha)
+    {
+        foreach (var (id, pos, expiresAt) in items)
+        {
+            double p = Progress(id, expiresAt);
+            double radius = r0 + p * (r1 - r0);
+            double alpha = (1 - p) * maxAlpha;
+            dc.DrawEllipse(null, StrokePen(color, width, alpha), ToLocal(pos), radius, radius);
+        }
     }
 
     // ── 클릭 ripple ─────────────────────────────────────────────
-    private void DrawClicks(DrawingContext dc, OverlayFrame f)
+    private void DrawClicks(DrawingContext dc, IReadOnlyList<ClickEffect> clicks, Rgba color)
     {
-        var live = new HashSet<int>();
-        foreach (var c in f.Effects.Clicks)
+        foreach (var c in clicks)
         {
-            live.Add(c.Id);
-            if (!_clickFirstSeen.TryGetValue(c.Id, out var t0))
-            {
-                t0 = _now;
-                _clickFirstSeen[c.Id] = t0;
-            }
-            double progress = Math.Clamp((_now - t0) / ClickLife, 0, 1);
-            double radius = 12 + progress * 40;
-            double alpha = (1 - progress) * (c.IsRight ? 0.5 : 0.75);
-            var color = f.Ring?.Color ?? new Rgba(0, 230, 255);
-            var pen = new Pen(MakeBrush(color, alpha), c.IsDouble ? 4 : 2);
-            pen.Freeze();
-            dc.DrawEllipse(null, pen, ToLocal(c.Position), radius, radius);
+            double p = Progress(c.Id, c.ExpiresAt);
+            double radius = 12 + p * 40;
+            double alpha = (1 - p) * (c.IsRight ? 0.5 : 0.75);
+            dc.DrawEllipse(null, StrokePen(color, c.IsDouble ? 4 : 2, alpha), ToLocal(c.Position), radius, radius);
         }
-
-        if (_clickFirstSeen.Count > live.Count)
-            foreach (var id in _clickFirstSeen.Keys.Where(id => !live.Contains(id)).ToList())
-                _clickFirstSeen.Remove(id);
     }
 
     // ── 커서 링 ─────────────────────────────────────────────────
@@ -84,9 +156,21 @@ internal sealed class OverlayElement : FrameworkElement
     {
         if (f.Ring is not { } ring || f.CursorPosition is not { } cursor) return;
         double r = ring.Radius * ring.Scale;
-        var pen = new Pen(MakeBrush(ring.Color, ring.Opacity), 3);
-        pen.Freeze();
-        dc.DrawEllipse(null, pen, ToLocal(cursor), r, r);
+        dc.DrawEllipse(null, StrokePen(ring.Color, 3, ring.Opacity), ToLocal(cursor), r, r);
+    }
+
+    // ── 드래그 힌트 (anchored line + speed glow) ────────────────
+    private void DrawDrag(DrawingContext dc, OverlayFrame f)
+    {
+        if (f.Drag is not { } d) return;
+        var color = f.Ring?.Color ?? new Rgba(0, 230, 255);
+        var origin = ToLocal(d.Origin);
+        var cur = ToLocal(d.Current);
+        if (d.AnchoredLineVisible)
+            dc.DrawLine(StrokePen(color, 2, 0.7), origin, cur); // origin→current 기준선
+        // speed glow — 속도 클수록 커서에 옅은 후광
+        double glow = 6 + Math.Clamp(d.Velocity / 1000.0, 0, 1) * 18;
+        dc.DrawEllipse(MakeBrush(color, 0.18), null, cur, glow, glow);
     }
 
     // ── 그리기 도형 ─────────────────────────────────────────────
@@ -110,6 +194,78 @@ internal sealed class OverlayElement : FrameworkElement
         }
     }
 
+    // ── 라디얼 메뉴 (기본 wedge) ────────────────────────────────
+    private void DrawRadial(DrawingContext dc, OverlayFrame f, Rgba accent)
+    {
+        if (f.Radial is not { } radial || !radial.Visible) return;
+        var center = ToLocal(radial.Center);
+
+        // dead/main 가이드 원
+        dc.DrawEllipse(null, StrokePen(Rgba.FromWhite(0.25), 1.5, 1.0), center, Tokens.Radial.DeadRadius, Tokens.Radial.DeadRadius);
+        dc.DrawEllipse(null, StrokePen(Rgba.FromWhite(0.18), 1.0, 1.0), center, Tokens.Radial.MainOuter, Tokens.Radial.MainOuter);
+
+        // 선택된 sector wedge 강조 (선택 로직과 일치하게 그림 — cw=i*45 ↔ 화면각 90-cw)
+        // NOTE: 라디얼 좌표는 y-up(맥) 기준 — 자연스러운 "위=sector0" UX는 코디네이터 dy 반전 후속(TODO).
+        if (radial.Sector is { } sector)
+        {
+            double aLow = 67.5 - sector * 45.0;   // cw = sector*45+22.5
+            double aHigh = 112.5 - sector * 45.0; // cw = sector*45-22.5
+            var wedge = PieWedge(center, Tokens.Radial.DeadRadius, Tokens.Radial.MainOuter, aLow, aHigh);
+            dc.DrawGeometry(MakeBrush(accent, 0.30), StrokePen(accent, 2, 0.9), wedge);
+        }
+    }
+
+    private static Geometry PieWedge(Point c, double r0, double r1, double aLowDeg, double aHighDeg)
+    {
+        Point P(double r, double deg)
+        {
+            double a = deg * Math.PI / 180;
+            return new Point(c.X + r * Math.Cos(a), c.Y + r * Math.Sin(a));
+        }
+        var geo = new StreamGeometry();
+        using (var ctx = geo.Open())
+        {
+            ctx.BeginFigure(P(r0, aLowDeg), isFilled: true, isClosed: true);
+            ctx.LineTo(P(r1, aLowDeg), true, false);
+            ctx.ArcTo(P(r1, aHighDeg), new Size(r1, r1), 0, false, SweepDirection.Clockwise, true, false);
+            ctx.LineTo(P(r0, aHighDeg), true, false);
+            ctx.ArcTo(P(r0, aLowDeg), new Size(r0, r0), 0, false, SweepDirection.Counterclockwise, true, false);
+        }
+        geo.Freeze();
+        return geo;
+    }
+
+    // ── 키스트로크 카드 (하단 중앙) ─────────────────────────────
+    private void DrawKeystroke(DrawingContext dc, OverlayFrame f)
+    {
+        if (string.IsNullOrEmpty(f.Keystroke)) return;
+        double ppd = _monitor.DpiScale <= 0 ? 1.0 : _monitor.DpiScale;
+        var ft = new FormattedText(f.Keystroke, CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
+            new Typeface(new FontFamily("Segoe UI"), FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal),
+            (double)Tokens.Text.Label.Size, MakeBrush(Rgba.FromWhite(0.95), 1.0), ppd);
+
+        double padX = Tokens.Spacing.Lg, padY = Tokens.Spacing.Sm;
+        double w = ft.Width + padX * 2, h = ft.Height + padY * 2;
+        double x = (ActualWidth - w) / 2;
+        double y = ActualHeight - h - 64; // 하단에서 살짝 위
+        var rect = new Rect(x, y, w, h);
+        dc.DrawRoundedRectangle(MakeBrush(Tokens.Surface.Panel, 1.0), null, rect, Tokens.Radius.Lg, Tokens.Radius.Lg);
+        dc.DrawText(ft, new Point(x + padX, y + padY));
+    }
+
+    // ── 코브랜딩 워터마크 (비-순정일 때 회사명, 하단 우측) ──────
+    private void DrawBranding(DrawingContext dc, OverlayFrame f)
+    {
+        var b = f.Branding;
+        if (string.IsNullOrEmpty(b.CompanyName) || b.CompanyName == BrandingConfig.Default.CompanyName) return;
+        // 로고 이미지는 후속(에셋 비트맵 로드) — 여기선 회사명 텍스트만.
+        double ppd = _monitor.DpiScale <= 0 ? 1.0 : _monitor.DpiScale;
+        var ft = new FormattedText(b.CompanyName, CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
+            new Typeface("Segoe UI"), (double)Tokens.Text.Caption.Size, MakeBrush(b.AccentColor, 0.65), ppd);
+        dc.DrawText(ft, new Point(ActualWidth - ft.Width - Tokens.Spacing.Lg, ActualHeight - ft.Height - Tokens.Spacing.Lg));
+    }
+
+    // ── 도형 그리기 헬퍼 ────────────────────────────────────────
     private Pen StrokePen(Rgba color, double width, double opacity = 1.0)
     {
         var pen = new Pen(MakeBrush(color, opacity), width)
@@ -126,7 +282,6 @@ internal sealed class OverlayElement : FrameworkElement
     {
         if (s.Points.Count < 2)
         {
-            // 단일 점 — 작은 점 찍기(가시성)
             dc.DrawEllipse(MakeBrush(s.Color, opacity), null, ToLocal(s.Points[0]), width / 2, width / 2);
             return;
         }
@@ -154,14 +309,10 @@ internal sealed class OverlayElement : FrameworkElement
         var b = ToLocal(s.Points[1]);
         var pen = StrokePen(s.Color, s.LineWidth);
         dc.DrawLine(pen, a, b);
-
         double theta = Math.Atan2(b.Y - a.Y, b.X - a.X);
-        double len = Tokens.Drawing.ArrowHeadLength;
-        double ang = Tokens.Drawing.ArrowHeadAngle;
-        var p1 = new Point(b.X - len * Math.Cos(theta - ang), b.Y - len * Math.Sin(theta - ang));
-        var p2 = new Point(b.X - len * Math.Cos(theta + ang), b.Y - len * Math.Sin(theta + ang));
-        dc.DrawLine(pen, b, p1);
-        dc.DrawLine(pen, b, p2);
+        double len = Tokens.Drawing.ArrowHeadLength, ang = Tokens.Drawing.ArrowHeadAngle;
+        dc.DrawLine(pen, b, new Point(b.X - len * Math.Cos(theta - ang), b.Y - len * Math.Sin(theta - ang)));
+        dc.DrawLine(pen, b, new Point(b.X - len * Math.Cos(theta + ang), b.Y - len * Math.Sin(theta + ang)));
     }
 
     private void DrawRect(DrawingContext dc, DrawingShape s)
@@ -184,7 +335,6 @@ internal sealed class OverlayElement : FrameworkElement
         double r = Tokens.Drawing.BadgeRadius;
         dc.DrawEllipse(MakeBrush(s.Color, 1.0),
             StrokePen(Rgba.FromWhite(0.9), Tokens.Drawing.BadgeBorderWidth), center, r, r);
-
         var label = (s.BadgeNumber ?? 0).ToString(CultureInfo.InvariantCulture);
         double ppd = _monitor.DpiScale <= 0 ? 1.0 : _monitor.DpiScale;
         var textColor = s.Color.NeedsDarkText ? Rgba.FromBlack(0.9) : Rgba.FromWhite(0.95);
