@@ -28,6 +28,13 @@ internal sealed class OverlayElement : FrameworkElement
     private double _lastNow = -1;
     private int _lastClickId; // 새 클릭 감지(효과 Id는 단조 증가)
 
+    // 라디얼 등장 애니메이션 타이밍 (맥 appear/stagger 대응)
+    private double _radialOpenAt = -1;
+    private int? _radialSeenSector;
+    private double _radialSectorAt;
+    private int? _radialSeenSub;
+    private double _radialSubAt;
+
     public OverlayElement(MonitorInfo monitor, Func<double> clock)
     {
         _monitor = monitor;
@@ -321,30 +328,44 @@ internal sealed class OverlayElement : FrameworkElement
     // ── 라디얼 메뉴 (맥 RadialMenuView 대응 — 채워진 pie wedge + 중앙 컨텍스트) ──
     private void DrawRadial(DrawingContext dc, OverlayFrame f, Rgba accent)
     {
-        if (f.Radial is not { } radial || !radial.Visible) return;
+        if (f.Radial is not { } radial || !radial.Visible)
+        {
+            _radialOpenAt = -1; _radialSeenSector = null; _radialSeenSub = null;
+            return;
+        }
         var center = ToLocal(radial.Center);
         double dead = Tokens.Radial.DeadRadius, main = Tokens.Radial.MainOuter;
         double subR = Tokens.Radial.SubOuter, subSubR = Tokens.Radial.SubSubOuter;
         var guide = StrokePen(Rgba.FromWhite(0.18), 1.0);
 
-        // (1) 8개 메인 wedge(채워진 pie) — 선택=accent0.9 / 활성=accent0.35 / 유휴=어두움
+        // 등장 타이밍 — 메뉴 open / sector 선택 / sub 선택 시점 기록(맥 appear/stagger).
+        if (_radialOpenAt < 0) _radialOpenAt = _now;
+        if (_radialSeenSector != radial.Sector) { _radialSeenSector = radial.Sector; _radialSectorAt = _now; }
+        if (_radialSeenSub != radial.Sub) { _radialSeenSub = radial.Sub; _radialSubAt = _now; }
+        double el = _now - _radialOpenAt, elSub = _now - _radialSectorAt, elSubSub = _now - _radialSubAt;
+
+        // 전체 메뉴 scale-in (0.85 → 1.0)
+        double os = 0.85 + 0.15 * EaseOut(Clamp01(el / 0.22));
+        dc.PushTransform(new ScaleTransform(os, os, center.X, center.Y));
+
+        // (1) 8개 메인 wedge + 아이콘 — 시계방향 순차 페이드(stagger)
         for (int i = 0; i < 8; i++)
         {
+            double wp = EaseOut(Clamp01((el - i * 0.035) / 0.22));
+            if (wp <= 0.001) continue;
             bool active = radial.Sector == i;
             bool mainSel = active && radial.Sub is null;
             Brush fill = mainSel ? MakeBrush(accent, 0.9)
                        : active ? MakeBrush(accent, 0.35)
                        : MakeBrush(Tokens.Surface.MainIdle, 1.0);
+            dc.PushOpacity(wp);
             FillWedge(dc, center, dead, main, i * 45.0, 22.5, fill, guide);
-        }
-        for (int i = 0; i < 8; i++)
-        {
-            bool active = radial.Sector == i;
-            DrawCenteredText(dc, ((RadialMenuItem)i).Label(), Polar(center, (dead + main) / 2, i * 45.0),
-                (double)Tokens.Text.CaptionSmall.Size, Rgba.FromWhite(active ? 1.0 : 0.85), bold: active);
+            DrawSectorIcon(dc, (RadialMenuItem)i, Polar(center, (dead + main) / 2, i * 45.0),
+                Rgba.FromWhite(active ? 1.0 : 0.9));
+            dc.Pop();
         }
 
-        // (2) 활성 sector의 sub fan(채워진 wedge) — 섹터 hover 즉시 펼침(맥). 선택/현재값/branch/leaf 색 구분.
+        // (2) 활성 sector의 sub fan — 섹터 hover 즉시 펼침(맥). 선택/현재값/branch/leaf 색 + stagger.
         if (radial.Sector is { } sct)
         {
             var item = (RadialMenuItem)sct;
@@ -354,6 +375,8 @@ internal sealed class OverlayElement : FrameworkElement
                 double subSpan = item.SubSpan(), subStep = subSpan / subs.Count, subStart = sct * 45.0 - subSpan / 2;
                 for (int j = 0; j < subs.Count; j++)
                 {
+                    double sp = EaseOut(Clamp01((elSub - j * 0.06) / 0.24));
+                    if (sp <= 0.001) continue;
                     double cw = subStart + subStep * (j + 0.5);
                     bool selSub = radial.Sub == j;
                     bool curSub = radial.SubActive is { } sa && j < sa.Count && sa[j];
@@ -362,34 +385,41 @@ internal sealed class OverlayElement : FrameworkElement
                                : curSub ? MakeBrush(accent, 0.40)
                                : branch ? MakeBrush(accent, Tokens.Radial.BranchFillOpacity)
                                : MakeBrush(Tokens.Surface.Subtle, 1.0);
+                    dc.PushOpacity(sp);
                     FillWedge(dc, center, main, subR, cw, subStep / 2, fill, guide);
                     DrawCenteredText(dc, subs[j].Label, Polar(center, (main + subR) / 2, cw),
                         (double)Tokens.Text.Caption.Size, Rgba.FromWhite(1.0), bold: selSub);
                     if (branch) DrawChevron(dc, center, subR - 9, cw);
+                    dc.Pop();
                 }
 
-                // (3) 선택된 branch sub의 subSub fan
+                // (3) 선택된 branch sub의 subSub fan — stagger
                 if (radial.Sub is { } subI && subI < subs.Count && subs[subI].Children is { Count: > 0 } kids)
                 {
                     double subCenter = RadialHitTest.SubCenterAngle(sct, subI, subSpan, subs.Count);
                     double ssSpan = item.SubSubSpan(subI), ssStep = ssSpan / kids.Count, ssStart = subCenter - ssSpan / 2;
                     for (int k = 0; k < kids.Count; k++)
                     {
+                        double ssp = EaseOut(Clamp01((elSubSub - k * 0.06) / 0.24));
+                        if (ssp <= 0.001) continue;
                         double cw = ssStart + ssStep * (k + 0.5);
                         bool selSS = radial.SubSub == k;
                         bool curSS = radial.SubSubActive is { } sa && k < sa.Count && sa[k];
                         Brush fill = selSS ? MakeBrush(accent, 0.9)
                                    : curSS ? MakeBrush(accent, 0.40)
                                    : MakeBrush(Tokens.Surface.Subtle, 1.0);
+                        dc.PushOpacity(ssp);
                         FillWedge(dc, center, subR, subSubR, cw, ssStep / 2, fill, guide);
                         DrawCenteredText(dc, kids[k].Label, Polar(center, (subR + subSubR) / 2, cw),
                             (double)Tokens.Text.CaptionSmall.Size, Rgba.FromWhite(1.0), bold: selSS);
+                        dc.Pop();
                     }
                 }
             }
         }
 
         // (4) 중심 — 어두운 원 + 컨텍스트(라벨/현재값) 또는 dead zone "✕ 닫기" (맥의 가운데=close)
+        dc.PushOpacity(EaseOut(Clamp01(el / 0.22)));
         dc.DrawEllipse(MakeBrush(Tokens.Surface.Veil, 1.0), null, center, dead, dead);
         if (radial.Sector is { } cs)
         {
@@ -406,6 +436,19 @@ internal sealed class OverlayElement : FrameworkElement
             DrawCenteredText(dc, "✕", new Point(center.X, center.Y - 7), 22, Rgba.FromWhite(0.9), bold: false);
             DrawCenteredText(dc, "닫기", new Point(center.X, center.Y + 13), (double)Tokens.Text.LabelTiny.Size, Rgba.FromWhite(0.6), bold: false);
         }
+        dc.Pop();
+
+        dc.Pop(); // scale transform
+    }
+
+    private static double Clamp01(double t) => Math.Clamp(t, 0, 1);
+    private static double EaseOut(double t) => 1 - Math.Pow(1 - t, 3);
+
+    /// <summary>셀프테스트용 — 라디얼 등장 애니메이션 시작 시점을 과거로 심어 정착 상태를 1회 렌더로 캡처.</summary>
+    internal void DebugSeedRadial(double openAt, int? sector, int? sub)
+    {
+        _radialOpenAt = openAt; _radialSectorAt = openAt; _radialSubAt = openAt;
+        _radialSeenSector = sector; _radialSeenSub = sub;
     }
 
     // 중앙에 표시할 상세 — sub/subSub hover면 그 라벨, 아니면 sector 현재값.
@@ -426,6 +469,74 @@ internal sealed class OverlayElement : FrameworkElement
     // cwCenter±cwHalf(cw deg) 범위, r0..r1 채워진 부채꼴.
     private void FillWedge(DrawingContext dc, Point center, double r0, double r1, double cwCenter, double cwHalf, Brush fill, Pen stroke)
         => dc.DrawGeometry(fill, stroke, PieWedge(center, r0, r1, (cwCenter - cwHalf) - 90, (cwCenter + cwHalf) - 90));
+
+    // 메인 sector 벡터 아이콘 (맥 SF Symbol 대응 — 폰트 tofu 회피용 직접 그림). p 중심, 약 ±9px.
+    private void DrawSectorIcon(DrawingContext dc, RadialMenuItem item, Point p, Rgba color)
+    {
+        var pen = StrokePen(color, 1.7);
+        var fill = MakeBrush(color, 1.0);
+        const double u = 9;
+        switch (item)
+        {
+            case RadialMenuItem.Spotlight: // 빛/타겟 — 원 + 중심점 + 광선
+                dc.DrawEllipse(null, pen, p, u * 0.5, u * 0.5);
+                dc.DrawEllipse(fill, null, p, u * 0.16, u * 0.16);
+                for (int k = 0; k < 8; k++)
+                {
+                    double a = k * 45 * Math.PI / 180;
+                    dc.DrawLine(pen, new Point(p.X + Math.Cos(a) * u * 0.72, p.Y + Math.Sin(a) * u * 0.72),
+                        new Point(p.X + Math.Cos(a) * u, p.Y + Math.Sin(a) * u));
+                }
+                break;
+            case RadialMenuItem.Magnifier: // 돋보기 — 원 + 손잡이
+                dc.DrawEllipse(null, pen, new Point(p.X - u * 0.25, p.Y - u * 0.25), u * 0.55, u * 0.55);
+                dc.DrawLine(pen, new Point(p.X + u * 0.2, p.Y + u * 0.2), new Point(p.X + u * 0.85, p.Y + u * 0.85));
+                break;
+            case RadialMenuItem.Glow: // 효과 — 4점 반짝임 + 작은 별
+                Sparkle(dc, new Point(p.X - u * 0.15, p.Y - u * 0.1), u * 0.7, fill);
+                Sparkle(dc, new Point(p.X + u * 0.55, p.Y + u * 0.5), u * 0.32, fill);
+                break;
+            case RadialMenuItem.RingSize: // 링 외형 — 이중 원
+                dc.DrawEllipse(null, pen, p, u * 0.85, u * 0.85);
+                dc.DrawEllipse(null, StrokePen(color, 1.2), p, u * 0.45, u * 0.45);
+                break;
+            case RadialMenuItem.Color: // 링 색 — 채운 원(스와치)
+                dc.DrawEllipse(fill, null, p, u * 0.7, u * 0.7);
+                break;
+            case RadialMenuItem.RingShape: // 링 모양 — 사각 + 원 겹침
+                dc.DrawRectangle(null, pen, new Rect(p.X - u * 0.85, p.Y - u * 0.55, u * 1.0, u * 1.0));
+                dc.DrawEllipse(null, pen, new Point(p.X + u * 0.25, p.Y + u * 0.1), u * 0.5, u * 0.5);
+                break;
+            case RadialMenuItem.Inspector: // 좌표/각도 — 십자선
+                dc.DrawLine(pen, new Point(p.X - u, p.Y), new Point(p.X + u, p.Y));
+                dc.DrawLine(pen, new Point(p.X, p.Y - u), new Point(p.X, p.Y + u));
+                dc.DrawEllipse(null, StrokePen(color, 1.2), p, u * 0.3, u * 0.3);
+                break;
+            case RadialMenuItem.Keystroke: // 키 입력 — 키캡(둥근 사각) + 점들
+                dc.DrawRoundedRectangle(null, pen, new Rect(p.X - u, p.Y - u * 0.65, u * 2, u * 1.3), 2, 2);
+                for (int k = -1; k <= 1; k++)
+                    dc.DrawEllipse(fill, null, new Point(p.X + k * u * 0.5, p.Y), u * 0.12, u * 0.12);
+                break;
+        }
+    }
+
+    private void Sparkle(DrawingContext dc, Point p, double r, Brush fill)
+    {
+        var geo = new StreamGeometry();
+        using (var ctx = geo.Open())
+        {
+            ctx.BeginFigure(new Point(p.X, p.Y - r), true, true);
+            ctx.LineTo(new Point(p.X + r * 0.3, p.Y - r * 0.3), true, false);
+            ctx.LineTo(new Point(p.X + r, p.Y), true, false);
+            ctx.LineTo(new Point(p.X + r * 0.3, p.Y + r * 0.3), true, false);
+            ctx.LineTo(new Point(p.X, p.Y + r), true, false);
+            ctx.LineTo(new Point(p.X - r * 0.3, p.Y + r * 0.3), true, false);
+            ctx.LineTo(new Point(p.X - r, p.Y), true, false);
+            ctx.LineTo(new Point(p.X - r * 0.3, p.Y - r * 0.3), true, false);
+        }
+        geo.Freeze();
+        dc.DrawGeometry(fill, null, geo);
+    }
 
     // branch sub 바깥에 외향 삼각형(펼침 가능 암시).
     private void DrawChevron(DrawingContext dc, Point center, double r, double cwDeg)

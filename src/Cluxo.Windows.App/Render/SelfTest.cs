@@ -171,9 +171,10 @@ internal static class SelfTest
     public static int RunRadial()
     {
         const int S = 520;
-        double now = 0.2;
+        double now = 1.5; // 애니메이션 완료 후 시점
         var monitor = new MonitorInfo("M", new RectD(0, 0, S, S), 1.0, true);
         var el = new OverlayElement(monitor, () => now);
+        el.DebugSeedRadial(openAt: 0.0, sector: 0, sub: 1); // 0초에 열린 것으로 심음 → now=1.5면 정착
 
         var values = new[] { "켜짐 · 130pt", "꺼짐", "2/4 켜짐", "보통 (54pt)", "하늘색", "원형", "1/2 켜짐", "꺼짐" };
         var radial = new RadialVisual(Visible: true, Center: new PointD(S / 2.0, S / 2.0),
