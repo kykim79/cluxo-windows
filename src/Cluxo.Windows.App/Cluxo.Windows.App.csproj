@@ -17,6 +17,8 @@
     <UseWPF>true</UseWPF>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <StartupObject>Cluxo.Windows.App.Program</StartupObject>
+    <!-- 퍼블리시 시 ReadyToRun(AOT 사전컴파일)로 cold-start JIT 절감(~150-200ms). build/test엔 무영향. -->
+    <PublishReadyToRun>true</PublishReadyToRun>
   </PropertyGroup>
 
   <ItemGroup>
