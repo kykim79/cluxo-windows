@@ -44,6 +44,8 @@ internal sealed class SettingsWindow : Window
         panel.Children.Add(SliderRow("투명도", s.RingOpacity, 0.2, 1.0, 0.05, v => s.RingOpacity = v, v => $"{(int)Math.Round(v * 100)}%"));
         panel.Children.Add(EnumRow("외곽선 두께", s.BorderWeight, v => s.BorderWeight = v, v => v.Label()));
         panel.Children.Add(EnumRow("선 스타일", s.BorderStyle, v => s.BorderStyle = v, v => v.Label()));
+        panel.Children.Add(CheckRow("이중 링", s.HasInnerRing, v => s.HasInnerRing = v));
+        panel.Children.Add(CheckRow("링 채우기", s.IsRingFillEnabled, v => s.IsRingFillEnabled = v));
 
         panel.Children.Add(Header("효과"));
         panel.Children.Add(CheckRow("글로우", s.IsGlowEnabled, v => s.IsGlowEnabled = v));
