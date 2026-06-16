@@ -157,6 +157,14 @@ internal sealed class OverlayElement : FrameworkElement
         if (f.Ring is not { } ring || f.CursorPosition is not { } cursor) return;
         double r = ring.Radius * ring.Scale;
         var c = ToLocal(cursor);
+
+        // 글로우 — 커서 주위 은은한 후광(accent 라디얼 그라디언트). 링 외곽선 뒤에 그린다.
+        if (ring.Glow)
+        {
+            double gr = r * 1.9;
+            dc.DrawEllipse(GlowBrush(ring.Color, ring.Opacity), null, c, gr, gr);
+        }
+
         var pen = RingPen(ring.Color, ring.BorderWidth, ring.Opacity, ring.Dashed);
 
         switch (ring.Shape)
@@ -188,6 +196,23 @@ internal sealed class OverlayElement : FrameworkElement
         if (dashed) pen.DashStyle = new DashStyle(new double[] { 4, 3 }, 0); // 폭 단위 대시
         pen.Freeze();
         return pen;
+    }
+
+    // 커서 글로우 — 중심이 진하고 가장자리로 사라지는 라디얼 그라디언트.
+    private static Brush GlowBrush(Rgba color, double opacity)
+    {
+        byte a = (byte)Math.Clamp(90 * opacity, 0, 255);
+        var b = new RadialGradientBrush
+        {
+            GradientOrigin = new Point(0.5, 0.5),
+            Center = new Point(0.5, 0.5),
+            RadiusX = 0.5,
+            RadiusY = 0.5,
+        };
+        b.GradientStops.Add(new GradientStop(Color.FromArgb(a, color.R, color.G, color.B), 0));
+        b.GradientStops.Add(new GradientStop(Color.FromArgb(0, color.R, color.G, color.B), 1));
+        b.Freeze();
+        return b;
     }
 
     // 중심 기준 정n각형 외곽(첫 꼭짓점 위, 12시). 화면 좌표.

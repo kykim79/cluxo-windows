@@ -21,7 +21,7 @@ public interface IMonitorProvider
 /// </summary>
 public readonly record struct RingVisual(
     Rgba Color, double Radius, double Scale, double Opacity,
-    RingShape Shape = RingShape.Circle, double BorderWidth = 3.0, bool Dashed = false);
+    RingShape Shape = RingShape.Circle, double BorderWidth = 3.0, bool Dashed = false, bool Glow = false);
 
 /// <summary>드래그 중 시각 힌트 — anchored line(#17)·speed glow(#14, Velocity)·드래그 각도 라벨용.</summary>
 public readonly record struct DragVisual(

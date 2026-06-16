@@ -72,6 +72,15 @@ public sealed class OverlayCoordinator : IDisposable
     private bool _scrollEnabled = true;
     private bool _keystrokeEnabled;
     private bool _anchoredLineEnabled;
+    private bool _glowEnabled;
+    private bool _idlePulseEnabled = true;
+    private double _idleTimeout = 3.0;
+
+    // 정지펄스 idle 추적 — 커서가 deadband 안에서 idleTimeout 이상 멈추면 1회 펄스.
+    private PointD _idleAnchor;
+    private double _idleSince;
+    private bool _idlePulsed;
+    private const double IdleDeadband = 4;
 
     private const string LineWidthKey = "drawing.lineWidth";
     private const double DoubleClickWindow = 0.4;
@@ -191,6 +200,20 @@ public sealed class OverlayCoordinator : IDisposable
                         }
                         if (_anchoredLineEnabled) _runtime.CheckAnchoredLine(pos, now); // #17 거리/시간 임계
                     }
+                    else
+                    {
+                        // 정지펄스 — 커서가 멈춰 있고(버튼 안 누름) idleTimeout 경과 시 1회 펄스
+                        double idx = pos.X - _idleAnchor.X, idy = pos.Y - _idleAnchor.Y;
+                        if (idx * idx + idy * idy > IdleDeadband * IdleDeadband)
+                        {
+                            _idleAnchor = pos; _idleSince = now; _idlePulsed = false; // 움직임 → 재무장
+                        }
+                        else if (_idlePulseEnabled && !_idlePulsed && now - _idleSince >= _idleTimeout)
+                        {
+                            _effects.AddIdlePulse(pos, now);
+                            _idlePulsed = true;
+                        }
+                    }
                 }
             }
 
@@ -220,7 +243,7 @@ public sealed class OverlayCoordinator : IDisposable
             RingVisual? ring = cursorHere is null
                 ? null
                 : new RingVisual(_activeColor, _ringRadius, Scale: 1.0, _ringOpacity,
-                    _ringShape, _ringBorderWidth, _ringDashed);
+                    _ringShape, _ringBorderWidth, _ringDashed, _glowEnabled);
             // 효과는 이 모니터 영역 것만 (Mac의 per-screen 필터). TODO: 프레임당 Where/ToArray 최적화
             var effects = new OverlayEffects(
                 _effects.Clicks.Where(e => b.Contains(e.Position)).ToArray(),
@@ -287,6 +310,9 @@ public sealed class OverlayCoordinator : IDisposable
             _scrollEnabled = _settingsModel.IsScrollIndicatorEnabled;
             _keystrokeEnabled = _settingsModel.IsKeystrokeEnabled;
             _anchoredLineEnabled = _settingsModel.IsAnchoredLineEnabled;
+            _glowEnabled = _settingsModel.IsGlowEnabled;
+            _idlePulseEnabled = _settingsModel.IsIdlePulseEnabled;
+            _idleTimeout = _settingsModel.IdleTimeout;
         }
     }
 

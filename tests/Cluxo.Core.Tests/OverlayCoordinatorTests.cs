@@ -439,6 +439,53 @@ public class OverlayCoordinatorTests
     }
 
     [Fact]
+    public void Ring_Glow_FlagFromSetting()
+    {
+        var h = new Harness();
+        h.Settings.Store.Set("isGlowEnabled", true);
+        h.Coordinator.Start();
+        h.Cursor.Position = new PointD(100, 100);
+        h.Coordinator.RenderFrame();
+        Assert.True(h.Factory.Created["A"].Last!.Value.Ring!.Value.Glow);
+    }
+
+    [Fact]
+    public void IdlePulse_AfterTimeout_WhenStationary()
+    {
+        var h = new Harness(); // isIdlePulseEnabled 기본 true, idleTimeout 3.0
+        h.Coordinator.Start();
+        h.Cursor.Position = new PointD(100, 100);
+        h.Clock.NowSeconds = 0; h.Coordinator.RenderFrame();   // idle anchor at t=0
+        h.Clock.NowSeconds = 3.0; h.Coordinator.RenderFrame(); // 정지 3초 → 펄스
+        Assert.NotEmpty(h.Factory.Created["A"].Last!.Value.Effects.IdlePulses);
+    }
+
+    [Fact]
+    public void IdlePulse_ResetsOnMovement()
+    {
+        var h = new Harness();
+        h.Coordinator.Start();
+        h.Cursor.Position = new PointD(100, 100);
+        h.Clock.NowSeconds = 0; h.Coordinator.RenderFrame();
+        h.Cursor.Position = new PointD(300, 100); // 움직임 → 재무장
+        h.Clock.NowSeconds = 2.0; h.Coordinator.RenderFrame();
+        h.Clock.NowSeconds = 4.0; h.Coordinator.RenderFrame(); // 마지막 움직임(t=2)에서 2초 — 아직 미달
+        Assert.Empty(h.Factory.Created["A"].Last!.Value.Effects.IdlePulses);
+    }
+
+    [Fact]
+    public void IdlePulse_Disabled_NoPulse()
+    {
+        var h = new Harness();
+        h.Settings.Store.Set("isIdlePulseEnabled", false);
+        h.Coordinator.Start();
+        h.Cursor.Position = new PointD(100, 100);
+        h.Clock.NowSeconds = 0; h.Coordinator.RenderFrame();
+        h.Clock.NowSeconds = 3.0; h.Coordinator.RenderFrame();
+        Assert.Empty(h.Factory.Created["A"].Last!.Value.Effects.IdlePulses);
+    }
+
+    [Fact]
     public void Keystroke_OffByDefault_NotShown()
     {
         var h = new Harness();
@@ -499,6 +546,7 @@ public class OverlayCoordinatorTests
         Assert.Equal(RingShape.Circle, ring.Value.Shape);                 // 기본 모양
         Assert.Equal(BorderWeight.Thin.LineWidth(), ring.Value.BorderWidth); // 기본 두께 1.5
         Assert.False(ring.Value.Dashed);
+        Assert.False(ring.Value.Glow); // 기본 글로우 OFF
     }
 
     [Fact]

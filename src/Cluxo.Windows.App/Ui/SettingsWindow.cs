@@ -45,6 +45,8 @@ internal sealed class SettingsWindow : Window
         panel.Children.Add(EnumRow("선 스타일", s.BorderStyle, v => s.BorderStyle = v, v => v.Label()));
 
         panel.Children.Add(Header("효과"));
+        panel.Children.Add(CheckRow("글로우", s.IsGlowEnabled, v => s.IsGlowEnabled = v));
+        panel.Children.Add(CheckRow("정지 펄스", s.IsIdlePulseEnabled, v => s.IsIdlePulseEnabled = v));
         panel.Children.Add(CheckRow("트레일", s.IsTrailEnabled, v => s.IsTrailEnabled = v));
         panel.Children.Add(CheckRow("코멧 꼬리", s.IsCometTailEnabled, v => s.IsCometTailEnabled = v));
         panel.Children.Add(CheckRow("흔들기로 찾기", s.IsShakeEnabled, v => s.IsShakeEnabled = v));
