@@ -15,22 +15,38 @@ public interface IMonitorProvider
     event Action? MonitorsChanged;
 }
 
-/// <summary>커서 강조 링의 한 프레임 시각 상태. (EffectsState/Ring 뷰 이식 시 필드 확장)</summary>
+/// <summary>커서 강조 링의 한 프레임 시각 상태. (Ring 뷰 이식 시 필드 확장)</summary>
 public readonly record struct RingVisual(Rgba Color, double Radius, double Scale, double Opacity);
+
+/// <summary>한 모니터의 일시적 효과 스냅샷 (해당 모니터 영역 효과만 필터됨).</summary>
+public readonly record struct OverlayEffects(
+    IReadOnlyList<ClickEffect> Clicks,
+    IReadOnlyList<DoubleClickEffect> DoubleClicks,
+    IReadOnlyList<ScrollEffect> Scrolls,
+    IReadOnlyList<ShakeEffect> Shakes,
+    IReadOnlyList<IdlePulseEffect> IdlePulses,
+    IReadOnlyList<TrailPoint> Trail,
+    IReadOnlyList<TrailPoint> DragTrail)
+{
+    public static readonly OverlayEffects Empty = new(
+        Array.Empty<ClickEffect>(), Array.Empty<DoubleClickEffect>(), Array.Empty<ScrollEffect>(),
+        Array.Empty<ShakeEffect>(), Array.Empty<IdlePulseEffect>(),
+        Array.Empty<TrailPoint>(), Array.Empty<TrailPoint>());
+}
 
 /// <summary>
 /// 한 모니터·한 프레임의 불변 시각 스냅샷. 코디네이터가 Core 상태에서 만들어 렌더 스레드로 넘긴다.
 /// 불변이라 스레드 경계를 안전하게 건넌다(공유 가변 상태 없음).
 ///
-/// 현재는 이식된 상태만 담는다(커서 링·그리기 도형). 클릭/스크롤/트레일/흔들기 효과와
-/// 라디얼 메뉴 시각은 EffectsState/Radial 뷰 이식 시 필드를 추가한다.
+/// 라디얼 메뉴 시각은 Radial 뷰 이식 시 필드를 추가한다.
 /// </summary>
 public readonly record struct OverlayFrame(
     string MonitorId,
     PointD? CursorPosition,                  // null = 커서가 이 모니터에 없음
     RingVisual? Ring,
     IReadOnlyList<DrawingShape> Shapes,
-    BrandingConfig Branding                  // 코브랜딩(워터마크/스플래시 등 렌더에 필요)
+    BrandingConfig Branding,                 // 코브랜딩(워터마크/스플래시 등 렌더에 필요)
+    OverlayEffects Effects = default         // 일시적 효과(모니터별 필터)
 );
 
 /// <summary>

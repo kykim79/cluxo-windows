@@ -31,6 +31,7 @@ public sealed class OverlayCoordinator : IDisposable
 
     private readonly DrawingState _drawing = new();
     private readonly ShakeState _shake = new();
+    private readonly EffectsState _effects = new();
     private readonly object _gate = new();
     private readonly Dictionary<string, IOverlayRenderer> _renderers = new();
     private readonly List<IDisposable> _hotkeyRegs = new();
@@ -41,7 +42,14 @@ public sealed class OverlayCoordinator : IDisposable
     private bool _running;
     private bool _disposed;
 
+    // 더블클릭 감지 — 같은 위치 근처 0.4초 내 두 번째 좌클릭.
+    private double _lastLeftDownTime = double.NegativeInfinity;
+    private PointD _lastLeftDownPos;
+    private double _animationSpeed = 1.0; // CursorSettings 이식 시 그쪽에서
+
     private const string LineWidthKey = "drawing.lineWidth";
+    private const double DoubleClickWindow = 0.4;
+    private const double DoubleClickRadius = 6;
 
     /// <summary>그리기 색 — CursorSettings.ringColor 이식 시 그쪽에서. 임시 기본 빨강.</summary>
     public Rgba DrawColor { get; set; } = Rgba.Red;
@@ -97,16 +105,28 @@ public sealed class OverlayCoordinator : IDisposable
         if (!_running) return;
         PointD pos = _cursor.GetCursorPosition();
 
+        double now = _clock.NowSeconds;
         List<(IOverlayRenderer Renderer, OverlayFrame Frame)> batch;
         lock (_gate)
         {
-            // 흔들기 감지 — 시간은 IClock에서만(wall clock 없음). (TODO: 감지 시 find-cursor 효과 연결)
-            _ = _shake.Record(pos.X, pos.Y, _clock.NowSeconds);
+            bool drawing = _drawing.IsDrawingModeActive;
+            // 흔들기 감지 — 시간은 IClock에서만(wall clock 없음)
+            bool shook = _shake.Record(pos.X, pos.Y, now);
 
-            // 그리기 드래그 경로 — 후킹이 아니라 프레임 샘플 위치를 따라간다(하이브리드 입력)
-            if (_drawing.IsDrawingModeActive && _leftDown)
-                _drawing.UpdateShape(pos);
+            if (drawing)
+            {
+                // 그리기 드래그 경로 — 후킹이 아니라 프레임 샘플 위치를 따라간다(하이브리드 입력)
+                if (_leftDown) _drawing.UpdateShape(pos);
+            }
+            else
+            {
+                // 일시적 효과는 그리기 모드에선 억제(오버레이가 annotation 전용)
+                if (shook) _effects.AddShake(pos, now, _animationSpeed);
+                _effects.UpdateTrail(pos);
+                if (_leftDown) _effects.UpdateDragTrail(pos); // 비-그리기 드래그(창 이동 등) streak
+            }
 
+            _effects.Prune(now); // 만료 효과 + 드래그 trail fade 진행
             batch = BuildFrames(pos);
         }
 
@@ -124,44 +144,94 @@ public sealed class OverlayCoordinator : IDisposable
         foreach (var monitor in _monitors.Monitors)
         {
             if (!_renderers.TryGetValue(monitor.Id, out var renderer)) continue;
-            PointD? cursorHere = monitor.Bounds.Contains(pos) ? pos : null;
+            var b = monitor.Bounds;
+            PointD? cursorHere = b.Contains(pos) ? pos : null;
             // 링 외형은 CursorSettings/RingAppearance 이식 시 — 지금은 토큰 기반 기본값
             RingVisual? ring = cursorHere is null
                 ? null
                 : new RingVisual(DrawColor, Radius: 24, Scale: 1.0, Opacity: 1.0);
-            result.Add((renderer, new OverlayFrame(monitor.Id, cursorHere, ring, shapes, branding)));
+            // 효과는 이 모니터 영역 것만 (Mac의 per-screen 필터). TODO: 프레임당 Where/ToArray 최적화
+            var effects = new OverlayEffects(
+                _effects.Clicks.Where(e => b.Contains(e.Position)).ToArray(),
+                _effects.DoubleClicks.Where(e => b.Contains(e.Position)).ToArray(),
+                _effects.Scrolls.Where(e => b.Contains(e.Position)).ToArray(),
+                _effects.Shakes.Where(e => b.Contains(e.Position)).ToArray(),
+                _effects.IdlePulses.Where(e => b.Contains(e.Position)).ToArray(),
+                _effects.Trail.Where(e => b.Contains(e.Position)).ToArray(),
+                _effects.DragTrail.Where(e => b.Contains(e.Position)).ToArray());
+            result.Add((renderer, new OverlayFrame(monitor.Id, cursorHere, ring, shapes, branding, effects)));
         }
         return result;
+    }
+
+    private MonitorInfo? MonitorContaining(PointD point)
+    {
+        foreach (var m in _monitors.Monitors)
+            if (m.Bounds.Contains(point)) return m;
+        return null;
+    }
+
+    private bool DetectDoubleClick(PointD point, double now)
+    {
+        double dx = point.X - _lastLeftDownPos.X, dy = point.Y - _lastLeftDownPos.Y;
+        bool isDouble = (now - _lastLeftDownTime) <= DoubleClickWindow
+                        && Math.Sqrt(dx * dx + dy * dy) <= DoubleClickRadius;
+        _lastLeftDownTime = isDouble ? double.NegativeInfinity : now; // 더블 후 리셋(트리플 방지)
+        _lastLeftDownPos = point;
+        return isDouble;
     }
 
     private void ToggleDrawingMode() { lock (_gate) _drawing.ToggleMode(); }
 
     private void OnButtonDown(MouseButton button, PointD point)
     {
+        double now = _clock.NowSeconds;
         lock (_gate)
         {
-            if (button != MouseButton.Left) return; // (TODO: 우/중클릭 효과)
-            _leftDown = true;
+            if (button == MouseButton.Left) _leftDown = true;
+
             if (_drawing.IsDrawingModeActive)
-                _drawing.StartShape(point, _modifiers, DrawColor);
-            // else: 클릭 스포트라이트/리플 (EffectsState 이식 시)
+            {
+                if (button == MouseButton.Left)
+                    _drawing.StartShape(point, _modifiers, DrawColor);
+                return; // 그리기 모드 — 클릭 효과 억제
+            }
+
+            // 비-그리기: 클릭 스포트라이트/리플 (좌/우, 더블클릭 동반)
+            if (button == MouseButton.Left || button == MouseButton.Right)
+            {
+                bool isDouble = button == MouseButton.Left && DetectDoubleClick(point, now);
+                _effects.AddClick(point, isRight: button == MouseButton.Right, isDouble, now, _animationSpeed);
+            }
         }
     }
 
     private void OnButtonUp(MouseButton button, PointD point)
     {
+        double now = _clock.NowSeconds;
         lock (_gate)
         {
             if (button != MouseButton.Left) return;
             _leftDown = false;
             if (_drawing.IsDrawingModeActive)
                 _drawing.EndShape();
+            else
+                _effects.BeginDragTrailFade(now); // 비-그리기 드래그 종료 → streak fade out
         }
     }
 
     private void OnScrolled(ScrollDelta delta, PointD point)
     {
-        // TODO: 스크롤 효과 (EffectsState 이식 시)
+        double now = _clock.NowSeconds;
+        lock (_gate)
+        {
+            if (_drawing.IsDrawingModeActive) return; // 그리기 모드 — 효과 억제
+            bool isVertical = Math.Abs(delta.Y) >= Math.Abs(delta.X);
+            double magnitude = isVertical ? Math.Abs(delta.Y) : Math.Abs(delta.X);
+            bool isPositive = isVertical ? delta.Y > 0 : delta.X > 0;
+            _effects.AddScroll(point, isPositive, isVertical, magnitude,
+                MonitorContaining(point)?.Bounds, now, _animationSpeed);
+        }
     }
 
     private void OnHookRemoved() => MouseHookLost?.Invoke(); // T2: 사용자에게 알림(구현이 재설치)

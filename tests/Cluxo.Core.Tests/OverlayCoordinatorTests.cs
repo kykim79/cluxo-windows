@@ -270,4 +270,81 @@ public class OverlayCoordinatorTests
         Assert.False(h.Mouse.Started);
         Assert.False(h.Foreground.Started);
     }
+
+    // ── 효과 배선 ───────────────────────────────────────────────
+
+    [Fact]
+    public void LeftClick_NotDrawing_AddsClickEffect()
+    {
+        var h = new Harness();
+        h.Coordinator.Start();
+        h.Mouse.Down(MouseButton.Left, new PointD(100, 100)); // 모니터 A 영역
+        h.Coordinator.RenderFrame();
+        Assert.Single(h.Factory.Created["A"].Last!.Value.Effects.Clicks);
+    }
+
+    [Fact]
+    public void DrawingMode_SuppressesClickEffect()
+    {
+        var h = new Harness();
+        h.Coordinator.Start();
+        h.EnterDrawingMode();
+        h.Mouse.Down(MouseButton.Left, new PointD(100, 100)); // 그리기 start, 클릭 효과 X
+        h.Coordinator.RenderFrame();
+        Assert.Empty(h.Factory.Created["A"].Last!.Value.Effects.Clicks);
+        Assert.True(h.Coordinator.IsDrawingModeActive);
+    }
+
+    [Fact]
+    public void RightClick_AddsClickEffect_MarkedRight()
+    {
+        var h = new Harness();
+        h.Coordinator.Start();
+        h.Mouse.Down(MouseButton.Right, new PointD(100, 100));
+        h.Coordinator.RenderFrame();
+        var clicks = h.Factory.Created["A"].Last!.Value.Effects.Clicks;
+        Assert.Single(clicks);
+        Assert.True(clicks[0].IsRight);
+    }
+
+    [Fact]
+    public void DoubleClick_DetectedWithinWindow()
+    {
+        var h = new Harness();
+        h.Coordinator.Start();
+        h.Clock.NowSeconds = 0.0;
+        h.Mouse.Down(MouseButton.Left, new PointD(100, 100)); // 1st
+        h.Clock.NowSeconds = 0.1;
+        h.Mouse.Down(MouseButton.Left, new PointD(101, 100)); // 2nd, 근처·0.4초 내
+        h.Coordinator.RenderFrame();
+        Assert.NotEmpty(h.Factory.Created["A"].Last!.Value.Effects.DoubleClicks);
+    }
+
+    [Fact]
+    public void Scroll_NotDrawing_AddsScrollEffect()
+    {
+        var h = new Harness();
+        h.Coordinator.Start();
+        h.Mouse.Scroll(new ScrollDelta(0, 5), new PointD(100, 100));
+        h.Coordinator.RenderFrame();
+        var scrolls = h.Factory.Created["A"].Last!.Value.Effects.Scrolls;
+        Assert.Single(scrolls);
+        Assert.True(scrolls[0].IsVertical);
+        Assert.True(scrolls[0].IsPositive);
+    }
+
+    [Fact]
+    public void Shake_DetectedThroughRenderFrames_AddsShakeEffect()
+    {
+        var h = new Harness();
+        h.Coordinator.Start();
+        double[] xs = { 0, 100, 0, 100, 0, 100, 0 };
+        foreach (var x in xs)
+        {
+            h.Cursor.Position = new PointD(x, 0);
+            h.Coordinator.RenderFrame();   // shake.Record + (감지 시) AddShake
+            h.Clock.NowSeconds += 0.05;
+        }
+        Assert.NotEmpty(h.Factory.Created["A"].Last!.Value.Effects.Shakes);
+    }
 }
