@@ -16,8 +16,15 @@ namespace Cluxo.Windows.App;
 internal static class Program
 {
     [STAThread]
-    private static void Main()
+    private static void Main(string[] args)
     {
+        // 개발/QA 셀프테스트 — 입력 합성이 막힌 환경에서 렌더·토글 검증(렌더만, 입력 후킹 X).
+        if (args.Length > 0 && args[0] == "--selftest")
+        {
+            Environment.Exit(SelfTest.Run());
+            return;
+        }
+
         using var input = new Win32InputLayer();
         using var shell = new Win32ShellLayer("Cluxo");
         using var overlay = new WpfOverlayHost(() => shell.Clock.NowSeconds);
