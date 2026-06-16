@@ -166,7 +166,10 @@ dotnet build Cluxo.Windows.sln
 
 가장 어려운 순서: **오버레이 렌더(DComp+Direct2D)** > 입력 후킹 > 트레이/설정. 오버레이부터 "빈 투명 윈도우에 링 하나 그리기"로 시작해 `OverlayFrame`을 점진 소비하는 게 좋다.
 
-> 오버레이 렌더 상세 설계(컴포지션 스택·DPI 변환·그리기 모드 입력 토글·구현 순서): **[OVERLAY-RENDER.md](OVERLAY-RENDER.md)**
+계층별 상세 설계:
+> - 오버레이 렌더(컴포지션 스택·DPI 변환·그리기 모드 입력 토글): **[OVERLAY-RENDER.md](OVERLAY-RENDER.md)**
+> - 입력(LL 후킹 스레드·timeout 회피·라디얼 chord hold): **[INPUT-LAYER.md](INPUT-LAYER.md)**
+> - Shell(설정·코브랜딩·트레이·발표앱 감지·모니터): **[SHELL-LAYER.md](SHELL-LAYER.md)**
 
 ---
 
