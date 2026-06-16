@@ -36,10 +36,11 @@ dotnet test       # Cluxo.Core 단위 테스트
 | KeystrokeOverlayState | ✅ 이식·테스트(6) | 키스트로크/상태알림 표시 + 자동 숨김. Task.sleep→시간주입 Tick(now) |
 | CursorSettings (+값 enum, RadialLabel) | ✅ 이식·테스트(15) | JsonSettingsStore 백업 타입 접근자(Swift 키·기본값). 8개 값 enum, effectiveRingColor, 신뢰 모니터, contentSpan/estLabelWidth. macOS 키코드·RadialMenuItem 트리는 제외(별도) |
 | CursorRuntimeState | ✅ 이식·테스트(9) | 위치·활성 토글·라디얼 선택·드래그 모션. 속도 EMA, anchored line 임계(거리100/시간1s), DragAngleAccumulator 재사용. 스프링 애니메이션·magnifier는 렌더/v1.1 |
+| RadialMenu (RadialMenuItem 트리) | ✅ 이식·테스트(18) | 8 sector 트리(subItems·라벨·desc, 정적), currentValue/isSubCurrent/isSubSubCurrent 상태 로직, SubSpan/SubSubSpan. RadialHitTest 구동. SF Symbol 아이콘은 렌더 계층 |
 
 추가 Core 타입: `PointD`/`RectD`/`Rgba`(+opacity 팩토리·needsDarkText), `Spring`/`Ease`/`FontToken`(Visuals), `KeyModifiers`/`SpecialKey`.
 
-**Cluxo.Core v1 순수 로직 + 디자인 토큰 이식 완료 — 234 tests green.** (GestureClassifier는 설계대로 제외: Windows에 raw 터치 입력원 없음.)
+**Cluxo.Core v1 순수 로직 + 디자인 토큰 이식 완료 — 252 tests green.** (GestureClassifier는 설계대로 제외: Windows에 raw 터치 입력원 없음.)
 
 ## 네이티브 계층 경계 (`Cluxo.Core.Platform`)
 
@@ -74,7 +75,7 @@ Core 상태 + 플랫폼 인터페이스를 배선하는 중앙 조정자 (Mac `A
 - **런타임 배선**(CursorRuntimeState): 커서 위치 추적, 비-그리기 좌클릭 드래그 → `StartDrag`/`EndDrag` + 프레임 델타로 속도(EMA)·각도·anchored line(거리/시간), `OverlayFrame.Drag`(커서 모니터만). ⌃⌥I → inspector(좌표) 토글.
 - TODO(상태 이식 시 연결): 발표앱 감지 동작, 정지펄스 트리거(idleTimeout), 라디얼 메뉴(RadialMenuItem 트리).
 
-**현재 234 tests green.** 다음 단계는 플랫폼 인터페이스의 **네이티브 구현**(Input/Render/Shell)으로, Windows 실행 환경(Parallels VM/미니PC)이 필요.
+**현재 252 tests green.** 다음 단계는 플랫폼 인터페이스의 **네이티브 구현**(Input/Render/Shell)으로, Windows 실행 환경(Parallels VM/미니PC)이 필요.
 
 ## 선행 게이트 (코드 본투자 전)
 
