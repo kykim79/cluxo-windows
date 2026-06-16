@@ -44,26 +44,52 @@ internal static class Program
             overlay.Factory, shell.Settings, shell.Branding, shell.Foreground, input.RadialTrigger, shell.Clock);
 
         using var exit = new ManualResetEventSlim(false);
-        coordinator.MouseHookLost += () => { /* TODO: 트레이 풍선 알림(후킹 재설치됨) */ };
 
-        shell.Tray.SetMenu(new[]
+        // T2: 마우스 후킹 분실 → 재설치됨을 트레이 풍선으로 알림.
+        coordinator.MouseHookLost += () => shell.ShowTrayBalloon("Cluxo", "마우스 후킹이 재설치되었습니다.");
+
+        // 트레이 메뉴 — 열 때마다 현재 상태로 체크 표시 갱신.
+        IReadOnlyList<TrayMenuItem> BuildMenu() => new[]
         {
-            new TrayMenuItem("drawing", "그리기 모드: Ctrl+Alt+D", IsEnabled: false),
-            new TrayMenuItem("inspector", "좌표 표시: Ctrl+Alt+I", IsEnabled: false),
+            new TrayMenuItem("drawing", "그리기 모드", IsChecked: coordinator.IsDrawingModeActive),
+            new TrayMenuItem("inspector", "좌표 표시", IsChecked: coordinator.IsInspectorActive),
+            new TrayMenuItem("startup", "로그인 시 실행", IsChecked: shell.LaunchAtLogin.IsEnabled),
             new TrayMenuItem("quit", "종료", IsSeparatorBefore: true),
-        });
-        shell.Tray.ItemClicked += id => { if (id == "quit") exit.Set(); };
+        };
+        shell.SetTrayMenuProvider(BuildMenu);
+        shell.Tray.SetMenu(BuildMenu()); // 초기 항목(폴백)
+        shell.Tray.ItemClicked += id =>
+        {
+            switch (id)
+            {
+                case "drawing": coordinator.ToggleDrawingMode(); break;
+                case "inspector": coordinator.ToggleInspector(); break;
+                case "startup": shell.LaunchAtLogin.IsEnabled = !shell.LaunchAtLogin.IsEnabled; break;
+                case "quit": exit.Set(); break;
+            }
+        };
 
         coordinator.Start();
         overlay.StartRenderLoop(
             coordinator.RenderFrame,
             capturesInput: () => coordinator.IsDrawingModeActive || coordinator.IsRadialMenuActive);
 
-        exit.Wait(); // 트레이 '종료' 선택까지 블록
+        // 테스트용 자동 종료 — 프로덕션 종료 경로를 그대로 타서 검증(--exit-after-ms N).
+        using var autoExit = ScheduleAutoExit(args, exit);
+
+        exit.Wait(); // 트레이 '종료'(또는 자동 종료)까지 블록
 
         // 종료 순서: 렌더 루프 정지 → 코디네이터 → 렌더 호스트 (UI 스레드가 _gate 다투지 않게)
         overlay.StopRenderLoop();
         coordinator.Dispose();
-        // using: overlay → shell → input 순으로 Dispose
+        // using: autoExit → overlay → shell → input 순으로 Dispose
+    }
+
+    private static IDisposable? ScheduleAutoExit(string[] args, ManualResetEventSlim exit)
+    {
+        int i = Array.IndexOf(args, "--exit-after-ms");
+        if (i >= 0 && i + 1 < args.Length && int.TryParse(args[i + 1], out int ms) && ms > 0)
+            return new Timer(_ => exit.Set(), null, ms, Timeout.Infinite);
+        return null;
     }
 }

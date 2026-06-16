@@ -21,6 +21,9 @@ internal sealed class Win32TrayIcon : ITrayIcon
 
     public event Action<string>? ItemClicked;
 
+    /// <summary>설정 시 메뉴를 열 때마다 현재 상태로 항목을 새로 빌드(체크 표시 갱신용). 없으면 <see cref="SetMenu"/> 정적 항목.</summary>
+    public Func<IReadOnlyList<TrayMenuItem>>? MenuProvider { get; set; }
+
     public Win32TrayIcon(MessageWindowHost host, string tooltip = "Cluxo")
     {
         _host = host;
@@ -56,9 +59,30 @@ internal sealed class Win32TrayIcon : ITrayIcon
             ShowMenu(); // 호스트 스레드에서 실행 중
     }
 
+    /// <summary>풍선 알림(예: 마우스 후킹 재설치 T2). 호스트 스레드로 마샬링.</summary>
+    public void ShowBalloon(string title, string text)
+    {
+        if (!_added) return;
+        _host.Post(() =>
+        {
+            var nid = new SN.NOTIFYICONDATA
+            {
+                cbSize = (uint)Marshal.SizeOf<SN.NOTIFYICONDATA>(),
+                hWnd = _host.Hwnd,
+                uID = TrayId,
+                uFlags = SN.NIF_INFO,
+                szInfo = text,
+                szInfoTitle = title,
+                szTip = _tooltip,
+                dwInfoFlags = SN.NIIF_INFO,
+            };
+            SN.Shell_NotifyIcon(SN.NIM_MODIFY, ref nid);
+        });
+    }
+
     private void ShowMenu()
     {
-        var items = _items;
+        var items = MenuProvider?.Invoke() ?? _items;
         if (items.Count == 0) return;
 
         IntPtr menu = SN.CreatePopupMenu();

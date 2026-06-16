@@ -34,6 +34,13 @@ public sealed class Win32ShellLayer : IDisposable
         _foreground = new Win32ForegroundAppMonitor(_host);
     }
 
+    /// <summary>트레이 메뉴를 열 때마다 현재 상태로 항목을 빌드(체크 표시 갱신).</summary>
+    public void SetTrayMenuProvider(Func<IReadOnlyList<TrayMenuItem>> provider)
+        => _tray.MenuProvider = provider;
+
+    /// <summary>트레이 풍선 알림(예: 마우스 후킹 재설치 T2).</summary>
+    public void ShowTrayBalloon(string title, string text) => _tray.ShowBalloon(title, text);
+
     public void Dispose()
     {
         if (_disposed) return;

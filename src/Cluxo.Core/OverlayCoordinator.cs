@@ -288,7 +288,8 @@ public sealed class OverlayCoordinator : IDisposable
         return isDouble;
     }
 
-    private void ToggleDrawingMode()
+    /// <summary>그리기 모드 토글 (⌃⌥D 핫키 + 트레이 메뉴 공용).</summary>
+    public void ToggleDrawingMode()
     {
         double now = _clock.NowSeconds;
         lock (_gate)
@@ -362,7 +363,8 @@ public sealed class OverlayCoordinator : IDisposable
         lock (_gate) _radial.Close(); // 선택 액션 실행(설정/런타임 변경)
     }
 
-    private void ToggleInspector()
+    /// <summary>좌표(inspector) 토글 (⌃⌥I 핫키 + 트레이 메뉴 공용).</summary>
+    public void ToggleInspector()
     {
         double now = _clock.NowSeconds;
         lock (_gate)
