@@ -26,7 +26,7 @@ dotnet test       # Cluxo.Core 단위 테스트
 |------|------|------|
 | ShakeState | ✅ 이식·테스트(17) | 시간 주입, 축별 독립 추적, 0.5초 dedup |
 | DragAngleLabel / DragAngleAccumulator | ✅ 이식·테스트(28) | ±π wrapping, 8방향 화살표(away-from-zero 반올림) |
-| RadialHitTest | ✅ 이식·테스트(11) | 거리/각도 → sector/sub/subSub, lock 유지. contentSpan 테스트는 CursorSettings 이식 때로 미룸 |
+| RadialHitTest | ✅ 이식·테스트(11) | 거리/각도 → sector/sub/subSub, lock 유지 |
 | KeyFormat | ✅ 이식·테스트(13) | 게이트(Ctrl/Alt/Win 필수)·순서·특수키 불변식 보존. 글리프는 Windows 관례(디자인 리뷰서 확정), VK 매핑은 플랫폼 계층 |
 | DrawingState | ✅ 이식·테스트(48) | 7개 도구·모디파이어 매핑(Cmd→Ctrl/Opt→Alt)·두께 단계·undo·툴바 hit-test. onboarding은 UI 계층 |
 | JsonSettingsStore (Persisted) | ✅ 이식·테스트(7) | %APPDATA% JSON 영구화. 기본값/손상 fallback·라운드트립. 파일IO·디바운스는 플랫폼 계층 |
@@ -34,10 +34,11 @@ dotnet test       # Cluxo.Core 단위 테스트
 | Tokens (DESIGN.md 전체) | ✅ 이식·테스트(19) | Surface/Stroke/Motion/Radial/Radius/Spacing/Drawing/Text 전체. SwiftUI 타입→플랫폼 무관 데이터 |
 | EffectsState | ✅ 이식·테스트(15) | 클릭/스크롤/흔들기/정지펄스/트레일 큐. Task.sleep→시간주입 Prune(now)로 대체(결정적). 트랙패드/클립보드 제외 |
 | KeystrokeOverlayState | ✅ 이식·테스트(6) | 키스트로크/상태알림 표시 + 자동 숨김. Task.sleep→시간주입 Tick(now) |
+| CursorSettings (+값 enum, RadialLabel) | ✅ 이식·테스트(15) | JsonSettingsStore 백업 타입 접근자(Swift 키·기본값). 8개 값 enum, effectiveRingColor, 신뢰 모니터, contentSpan/estLabelWidth. macOS 키코드·RadialMenuItem 트리는 제외(별도) |
 
 추가 Core 타입: `PointD`/`RectD`/`Rgba`(+opacity 팩토리·needsDarkText), `Spring`/`Ease`/`FontToken`(Visuals), `KeyModifiers`/`SpecialKey`.
 
-**Cluxo.Core v1 순수 로직 + 디자인 토큰 이식 완료 — 198 tests green.** (GestureClassifier는 설계대로 제외: Windows에 raw 터치 입력원 없음.)
+**Cluxo.Core v1 순수 로직 + 디자인 토큰 이식 완료 — 217 tests green.** (GestureClassifier는 설계대로 제외: Windows에 raw 터치 입력원 없음.)
 
 ## 네이티브 계층 경계 (`Cluxo.Core.Platform`)
 
@@ -70,7 +71,7 @@ Core 상태 + 플랫폼 인터페이스를 배선하는 중앙 조정자 (Mac `A
 - **키스트로크 배선**(KeystrokeOverlayState): `OnKeyPressed` → `KeyFormat.Format`(게이트로 단순 타이핑 제외) → `ShowKeystroke`, 그리기 토글 → `ShowStatusNotification`, `RenderFrame`에서 `Tick(now)` → `OverlayFrame.Keystroke`.
 - TODO(상태 이식 시 연결): 링 외형(CursorSettings), 발표앱 감지 동작, 정지펄스 트리거.
 
-**현재 202 tests green.** 다음 단계는 플랫폼 인터페이스의 **네이티브 구현**(Input/Render/Shell)으로, Windows 실행 환경(Parallels VM/미니PC)이 필요.
+**현재 217 tests green.** 다음 단계는 플랫폼 인터페이스의 **네이티브 구현**(Input/Render/Shell)으로, Windows 실행 환경(Parallels VM/미니PC)이 필요.
 
 ## 선행 게이트 (코드 본투자 전)
 
