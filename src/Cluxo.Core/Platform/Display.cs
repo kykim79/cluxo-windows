@@ -18,6 +18,10 @@ public interface IMonitorProvider
 /// <summary>커서 강조 링의 한 프레임 시각 상태. (Ring 뷰 이식 시 필드 확장)</summary>
 public readonly record struct RingVisual(Rgba Color, double Radius, double Scale, double Opacity);
 
+/// <summary>드래그 중 시각 힌트 — anchored line(#17)·speed glow(#14, Velocity)·드래그 각도 라벨용.</summary>
+public readonly record struct DragVisual(
+    PointD Origin, PointD Current, bool AnchoredLineVisible, double Velocity, double Angle);
+
 /// <summary>한 모니터의 일시적 효과 스냅샷 (해당 모니터 영역 효과만 필터됨).</summary>
 public readonly record struct OverlayEffects(
     IReadOnlyList<ClickEffect> Clicks,
@@ -47,7 +51,8 @@ public readonly record struct OverlayFrame(
     IReadOnlyList<DrawingShape> Shapes,
     BrandingConfig Branding,                 // 코브랜딩(워터마크/스플래시 등 렌더에 필요)
     OverlayEffects Effects = default,        // 일시적 효과(모니터별 필터)
-    string? Keystroke = null                 // 키스트로크 오버레이 텍스트(보이는 동안만, 렌더가 배치)
+    string? Keystroke = null,                // 키스트로크 오버레이 텍스트(보이는 동안만, 렌더가 배치)
+    DragVisual? Drag = null                  // 드래그 시각 힌트(커서 있는 모니터만)
 );
 
 /// <summary>

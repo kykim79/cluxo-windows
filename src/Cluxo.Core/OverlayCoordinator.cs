@@ -33,6 +33,7 @@ public sealed class OverlayCoordinator : IDisposable
     private readonly ShakeState _shake = new();
     private readonly EffectsState _effects = new();
     private readonly KeystrokeOverlayState _keystrokes = new();
+    private readonly CursorRuntimeState _runtime = new();
     private readonly object _gate = new();
     private readonly Dictionary<string, IOverlayRenderer> _renderers = new();
     private readonly List<IDisposable> _hotkeyRegs = new();
@@ -47,6 +48,10 @@ public sealed class OverlayCoordinator : IDisposable
     // 더블클릭 감지 — 같은 위치 근처 0.4초 내 두 번째 좌클릭.
     private double _lastLeftDownTime = double.NegativeInfinity;
     private PointD _lastLeftDownPos;
+
+    // 비-그리기 드래그 모션 — 속도/각도 계산용 직전 샘플.
+    private PointD _lastDragPos;
+    private double _lastDragTime;
 
     // 설정 캐시 — 60Hz 핫패스에서 매 프레임 store를 읽지 않게 ApplyRuntimeSettings에서만 갱신.
     private Rgba _activeColor = RingColor.Cyan.Color();
@@ -66,6 +71,10 @@ public sealed class OverlayCoordinator : IDisposable
     public double LineWidth { get { lock (_gate) return _drawing.LineWidth; } }
     public IReadOnlyList<DrawingShape> DrawingShapes { get { lock (_gate) return _drawing.Shapes.ToArray(); } }
     public string? Keystroke { get { lock (_gate) return _keystrokes.IsVisible ? _keystrokes.KeystrokeText : null; } }
+    public bool IsDragging { get { lock (_gate) return _runtime.IsDragging; } }
+    public double DragVelocity { get { lock (_gate) return _runtime.DragVelocity; } }
+    public bool AnchoredLineVisible { get { lock (_gate) return _runtime.AnchoredLineVisible; } }
+    public bool IsInspectorActive { get { lock (_gate) return _runtime.IsInspectorActive; } }
 
     public OverlayCoordinator(
         IMouseHook mouse, IKeyboardHook keyboard, IHotkeyRegistrar hotkeys,
@@ -89,9 +98,11 @@ public sealed class OverlayCoordinator : IDisposable
         lock (_gate) _drawing.LineWidth = _store.Get(LineWidthKey, Tokens.Drawing.LineWidth);
         ApplyRuntimeSettings(); // 캐시 채우기 + shake 민감도 적용
 
-        // ⌃⌥D → 그리기 모드 토글 (Mac과 동일 단축키)
+        // ⌃⌥D → 그리기 모드 토글, ⌃⌥I → 좌표(inspector) 토글 (Mac과 동일 단축키)
         _hotkeyRegs.Add(_hotkeys.Register(
             new HotkeyChord(KeyModifiers.Control | KeyModifiers.Alt, "D"), ToggleDrawingMode));
+        _hotkeyRegs.Add(_hotkeys.Register(
+            new HotkeyChord(KeyModifiers.Control | KeyModifiers.Alt, "I"), ToggleInspector));
 
         _mouse.ButtonDown += OnButtonDown;
         _mouse.ButtonUp += OnButtonUp;
@@ -118,6 +129,7 @@ public sealed class OverlayCoordinator : IDisposable
         List<(IOverlayRenderer Renderer, OverlayFrame Frame)> batch;
         lock (_gate)
         {
+            _runtime.CursorPosition = pos;
             bool drawing = _drawing.IsDrawingModeActive;
             // 흔들기 감지 — 시간은 IClock에서만(wall clock 없음)
             bool shook = _shake.Record(pos.X, pos.Y, now);
@@ -132,7 +144,22 @@ public sealed class OverlayCoordinator : IDisposable
                 // 일시적 효과는 그리기 모드에선 억제(오버레이가 annotation 전용)
                 if (shook) _effects.AddShake(pos, now, _animationSpeed);
                 _effects.UpdateTrail(pos);
-                if (_leftDown) _effects.UpdateDragTrail(pos); // 비-그리기 드래그(창 이동 등) streak
+                if (_leftDown)
+                {
+                    _effects.UpdateDragTrail(pos); // 비-그리기 드래그(창 이동 등) streak
+                    // 드래그 모션 — 프레임 샘플 위치 델타로 속도/각도(하이브리드 입력)
+                    double dt = now - _lastDragTime;
+                    if (dt > 0.0001)
+                    {
+                        double dx = pos.X - _lastDragPos.X, dy = pos.Y - _lastDragPos.Y;
+                        double dist = Math.Sqrt(dx * dx + dy * dy);
+                        _runtime.UpdateDragVelocity(dist / dt);
+                        if (dist > 0.5) _runtime.UpdateDragAngle(Math.Atan2(dy, dx));
+                        _lastDragPos = pos;
+                        _lastDragTime = now;
+                    }
+                    _runtime.CheckAnchoredLine(pos, now); // #17 거리/시간 임계
+                }
             }
 
             _effects.Prune(now);   // 만료 효과 + 드래그 trail fade 진행
@@ -170,7 +197,11 @@ public sealed class OverlayCoordinator : IDisposable
                 _effects.IdlePulses.Where(e => b.Contains(e.Position)).ToArray(),
                 _effects.Trail.Where(e => b.Contains(e.Position)).ToArray(),
                 _effects.DragTrail.Where(e => b.Contains(e.Position)).ToArray());
-            result.Add((renderer, new OverlayFrame(monitor.Id, cursorHere, ring, shapes, branding, effects, keystroke)));
+            // 드래그 시각 힌트 — 커서 있는 모니터에만 (anchored line·speed glow·각도)
+            DragVisual? drag = cursorHere is { } cp && _runtime.IsDragging && _runtime.DragOrigin is { } org
+                ? new DragVisual(org, cp, _runtime.AnchoredLineVisible, _runtime.DragVelocity, _runtime.DragAngle)
+                : null;
+            result.Add((renderer, new OverlayFrame(monitor.Id, cursorHere, ring, shapes, branding, effects, keystroke, drag)));
         }
         return result;
     }
@@ -237,7 +268,14 @@ public sealed class OverlayCoordinator : IDisposable
                 return; // 그리기 모드 — 클릭 효과 억제
             }
 
-            // 비-그리기: 클릭 스포트라이트/리플 (좌/우, 더블클릭 동반)
+            // 비-그리기: 좌클릭이면 드래그 모션 시작
+            if (button == MouseButton.Left)
+            {
+                _runtime.StartDrag(point, now);
+                _lastDragPos = point;
+                _lastDragTime = now;
+            }
+            // 클릭 스포트라이트/리플 (좌/우, 더블클릭 동반)
             if (button == MouseButton.Left || button == MouseButton.Right)
             {
                 bool isDouble = button == MouseButton.Left && DetectDoubleClick(point, now);
@@ -254,9 +292,25 @@ public sealed class OverlayCoordinator : IDisposable
             if (button != MouseButton.Left) return;
             _leftDown = false;
             if (_drawing.IsDrawingModeActive)
+            {
                 _drawing.EndShape();
+            }
             else
+            {
                 _effects.BeginDragTrailFade(now); // 비-그리기 드래그 종료 → streak fade out
+                _runtime.EndDrag();
+            }
+        }
+    }
+
+    private void ToggleInspector()
+    {
+        double now = _clock.NowSeconds;
+        lock (_gate)
+        {
+            _runtime.IsInspectorActive = !_runtime.IsInspectorActive;
+            _keystrokes.ShowStatusNotification(
+                _runtime.IsInspectorActive ? "좌표 표시 ON" : "좌표 표시 OFF", now);
         }
     }
 

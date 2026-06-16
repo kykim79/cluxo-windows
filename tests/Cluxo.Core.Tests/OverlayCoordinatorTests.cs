@@ -455,4 +455,67 @@ public class OverlayCoordinatorTests
         var click = h.Factory.Created["A"].Last!.Value.Effects.Clicks[0];
         Assert.Equal(0.7 * 1.7, click.ExpiresAt, 6);
     }
+
+    // ── CursorRuntimeState 배선 ──────────────────────────────────
+
+    [Fact]
+    public void NonDrawingDrag_TracksVelocityAndAnchoredLine()
+    {
+        var h = new Harness();
+        h.Coordinator.Start();
+        h.Clock.NowSeconds = 0;
+        h.Mouse.Down(MouseButton.Left, new PointD(0, 0)); // StartDrag
+
+        h.Cursor.Position = new PointD(100, 0); h.Clock.NowSeconds = 0.1;
+        h.Coordinator.RenderFrame();
+        h.Cursor.Position = new PointD(200, 0); h.Clock.NowSeconds = 0.2; // 원점서 200 > 100
+        h.Coordinator.RenderFrame();
+
+        Assert.True(h.Coordinator.IsDragging);
+        Assert.True(h.Coordinator.DragVelocity > 0);
+        Assert.True(h.Coordinator.AnchoredLineVisible);
+
+        h.Mouse.Up(MouseButton.Left, new PointD(200, 0));
+        Assert.False(h.Coordinator.IsDragging);
+        Assert.False(h.Coordinator.AnchoredLineVisible);
+    }
+
+    [Fact]
+    public void NonDrawingDrag_PutsDragVisualInFrame()
+    {
+        var h = new Harness();
+        h.Coordinator.Start();
+        h.Mouse.Down(MouseButton.Left, new PointD(0, 0));
+        h.Cursor.Position = new PointD(100, 0);
+        h.Coordinator.RenderFrame();
+
+        var drag = h.Factory.Created["A"].Last!.Value.Drag;
+        Assert.NotNull(drag);
+        Assert.Equal(new PointD(0, 0), drag!.Value.Origin);
+        Assert.Equal(new PointD(100, 0), drag.Value.Current);
+    }
+
+    [Fact]
+    public void DrawingMode_NoDragVisual()
+    {
+        var h = new Harness();
+        h.Coordinator.Start();
+        h.EnterDrawingMode();
+        h.Mouse.Down(MouseButton.Left, new PointD(0, 0)); // 그리기 — runtime 드래그 아님
+        h.Cursor.Position = new PointD(100, 0);
+        h.Coordinator.RenderFrame();
+        Assert.Null(h.Factory.Created["A"].Last!.Value.Drag);
+    }
+
+    [Fact]
+    public void InspectorHotkey_Toggles_AndNotifies()
+    {
+        var h = new Harness();
+        h.Coordinator.Start();
+        Assert.False(h.Coordinator.IsInspectorActive);
+        h.Hotkeys.Press(new HotkeyChord(KeyModifiers.Control | KeyModifiers.Alt, "I"));
+        Assert.True(h.Coordinator.IsInspectorActive);
+        h.Coordinator.RenderFrame();
+        Assert.Equal("좌표 표시 ON", h.Coordinator.Keystroke);
+    }
 }
