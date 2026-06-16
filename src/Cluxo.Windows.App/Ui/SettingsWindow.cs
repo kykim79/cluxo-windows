@@ -52,6 +52,7 @@ internal sealed class SettingsWindow : Window
         panel.Children.Add(CheckRow("흔들기로 찾기", s.IsShakeEnabled, v => s.IsShakeEnabled = v));
         panel.Children.Add(CheckRow("스크롤 표시", s.IsScrollIndicatorEnabled, v => s.IsScrollIndicatorEnabled = v));
         panel.Children.Add(CheckRow("드래그 기준선", s.IsAnchoredLineEnabled, v => s.IsAnchoredLineEnabled = v));
+        panel.Children.Add(CheckRow("드래그 각도", s.IsDragAngleLabelEnabled, v => s.IsDragAngleLabelEnabled = v));
         panel.Children.Add(CheckRow("키 입력 표시", s.IsKeystrokeEnabled, v => s.IsKeystrokeEnabled = v));
 
         panel.Children.Add(Header("동작"));

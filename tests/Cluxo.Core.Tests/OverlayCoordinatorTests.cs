@@ -708,6 +708,19 @@ public class OverlayCoordinatorTests
         Assert.NotNull(drag);
         Assert.Equal(new PointD(0, 0), drag!.Value.Origin);
         Assert.Equal(new PointD(100, 0), drag.Value.Current);
+        Assert.False(drag.Value.ShowAngleLabel); // 기본 OFF
+    }
+
+    [Fact]
+    public void DragVisual_ShowAngleLabel_FromSetting()
+    {
+        var h = new Harness();
+        h.Settings.Store.Set("isDragAngleLabelEnabled", true);
+        h.Coordinator.Start();
+        h.Mouse.Down(MouseButton.Left, new PointD(0, 0));
+        h.Cursor.Position = new PointD(100, 0);
+        h.Coordinator.RenderFrame();
+        Assert.True(h.Factory.Created["A"].Last!.Value.Drag!.Value.ShowAngleLabel);
     }
 
     [Fact]

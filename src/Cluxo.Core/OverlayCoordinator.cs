@@ -74,6 +74,7 @@ public sealed class OverlayCoordinator : IDisposable
     private bool _anchoredLineEnabled;
     private bool _glowEnabled;
     private bool _idlePulseEnabled = true;
+    private bool _dragAngleLabelEnabled;
     private double _idleTimeout = 3.0;
 
     // 정지펄스 idle 추적 — 커서가 deadband 안에서 idleTimeout 이상 멈추면 1회 펄스.
@@ -255,7 +256,8 @@ public sealed class OverlayCoordinator : IDisposable
                 _effects.DragTrail.Where(e => b.Contains(e.Position)).ToArray());
             // 드래그 시각 힌트 — 커서 있는 모니터에만 (anchored line·speed glow·각도)
             DragVisual? drag = cursorHere is { } cp && _runtime.IsDragging && _runtime.DragOrigin is { } org
-                ? new DragVisual(org, cp, _runtime.AnchoredLineVisible, _runtime.DragVelocity, _runtime.DragAngle)
+                ? new DragVisual(org, cp, _runtime.AnchoredLineVisible, _runtime.DragVelocity, _runtime.DragAngle,
+                    _dragAngleLabelEnabled)
                 : null;
             // 라디얼 메뉴 — 중심이 이 모니터에 있을 때만
             RadialVisual? radial = _runtime.IsRadialMenuActive && b.Contains(_runtime.RadialMenuCenter)
@@ -312,6 +314,7 @@ public sealed class OverlayCoordinator : IDisposable
             _anchoredLineEnabled = _settingsModel.IsAnchoredLineEnabled;
             _glowEnabled = _settingsModel.IsGlowEnabled;
             _idlePulseEnabled = _settingsModel.IsIdlePulseEnabled;
+            _dragAngleLabelEnabled = _settingsModel.IsDragAngleLabelEnabled;
             _idleTimeout = _settingsModel.IdleTimeout;
         }
     }

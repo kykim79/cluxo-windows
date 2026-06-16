@@ -213,7 +213,7 @@ internal static class SelfTest
             Trail: trail,
             DragTrail: Array.Empty<TrailPoint>());
 
-        var drag = new DragVisual(new PointD(300, 250), new PointD(440, 300), AnchoredLineVisible: true, Velocity: 800, Angle: 0.3);
+        var drag = new DragVisual(new PointD(300, 250), new PointD(440, 300), AnchoredLineVisible: true, Velocity: 800, Angle: 0.3, ShowAngleLabel: true);
         var radial = new RadialVisual(Visible: true, Center: new PointD(540, 210), Sector: 0, Sub: null, SubSub: null);
         var branding = new BrandingConfig { CompanyName = "Acme Corp", AccentColor = new Rgba(255, 150, 40) };
 

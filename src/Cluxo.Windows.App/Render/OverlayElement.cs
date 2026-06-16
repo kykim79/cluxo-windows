@@ -263,6 +263,27 @@ internal sealed class OverlayElement : FrameworkElement
         // speed glow — 속도 클수록 커서에 옅은 후광
         double glow = 6 + Math.Clamp(d.Velocity / 1000.0, 0, 1) * 18;
         dc.DrawEllipse(MakeBrush(color, 0.18), null, cur, glow, glow);
+
+        // 드래그 각도 라벨 — "↗ 45°" (설정 ON일 때만)
+        if (d.ShowAngleLabel)
+        {
+            int deg = DragAngleLabel.ClockwiseDegrees(d.Angle);
+            DrawLabelCard(dc, $"{DragAngleLabel.DirectionArrow(deg)} {deg}°",
+                new Point(cur.X + 22, cur.Y - 22), color);
+        }
+    }
+
+    // 작은 라벨 카드(어두운 배경 + accent 텍스트) — 좌상단 기준점.
+    private void DrawLabelCard(DrawingContext dc, string text, Point topLeft, Rgba accent)
+    {
+        double ppd = _monitor.DpiScale <= 0 ? 1.0 : _monitor.DpiScale;
+        var ft = new FormattedText(text, CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
+            new Typeface(new FontFamily("Segoe UI"), FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal),
+            (double)Tokens.Text.Caption.Size, MakeBrush(accent, 1.0), ppd);
+        double padX = Tokens.Spacing.Sm, padY = Tokens.Spacing.Xs;
+        var rect = new Rect(topLeft.X, topLeft.Y, ft.Width + padX * 2, ft.Height + padY * 2);
+        dc.DrawRoundedRectangle(MakeBrush(Tokens.Surface.Panel, 1.0), null, rect, Tokens.Radius.Sm, Tokens.Radius.Sm);
+        dc.DrawText(ft, new Point(topLeft.X + padX, topLeft.Y + padY));
     }
 
     // ── 그리기 도형 ─────────────────────────────────────────────

@@ -23,9 +23,11 @@ public readonly record struct RingVisual(
     Rgba Color, double Radius, double Scale, double Opacity,
     RingShape Shape = RingShape.Circle, double BorderWidth = 3.0, bool Dashed = false, bool Glow = false);
 
-/// <summary>드래그 중 시각 힌트 — anchored line(#17)·speed glow(#14, Velocity)·드래그 각도 라벨용.</summary>
+/// <summary>드래그 중 시각 힌트 — anchored line(#17)·speed glow(#14, Velocity)·드래그 각도 라벨용.
+/// ShowAngleLabel은 IsDragAngleLabelEnabled 설정 반영(각도 라벨 표시 여부).</summary>
 public readonly record struct DragVisual(
-    PointD Origin, PointD Current, bool AnchoredLineVisible, double Velocity, double Angle);
+    PointD Origin, PointD Current, bool AnchoredLineVisible, double Velocity, double Angle,
+    bool ShowAngleLabel = false);
 
 /// <summary>라디얼 메뉴 시각 상태 — 콘텐츠는 RadialMenu 트리, 선택은 인덱스. (커서 있는 모니터)</summary>
 public readonly record struct RadialVisual(
