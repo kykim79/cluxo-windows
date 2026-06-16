@@ -57,7 +57,17 @@ Shell: ISettingsStore · IBrandingProvider · ILaunchAtLogin · ITrayIcon · IMo
 - **T2 critical gap**: `IMouseHook.HookRemoved` — 후킹 제거 감지 → 재설치 + 알림.
 - 인터페이스는 테스트 더블로 시ams 조립 검증(PlatformTests 8): Clock→ShakeState, MouseHook→DrawingState, OverlayFrame 전달.
 
-다음 단계는 이 인터페이스의 **네이티브 구현**(Input/Render/Shell)으로, Windows 실행 환경(Parallels VM/미니PC)이 필요.
+## 코디네이터 (`OverlayCoordinator`)
+
+Core 상태 + 플랫폼 인터페이스를 배선하는 중앙 조정자 (Mac `AppDelegate` 대응). 인터페이스에만 의존 → Windows 없이 맥에서 전체 흐름 테스트(OverlayCoordinatorTests 9, 전부 fake 하니스).
+
+- **렌더 루프 미보유**: 플랫폼이 vsync마다 `RenderFrame()` 호출 → 테스트 가능.
+- **스레딩 규약 구현**: 입력 콜백은 `_gate` 락 안 Core 갱신만, `RenderFrame`은 락 안 스냅샷 → 락 밖 렌더(GPU 작업 중 락 X).
+- **하이브리드 입력 행사**: 그리기 드래그 경로는 후킹이 아니라 `RenderFrame`의 프레임 샘플 위치를 따라간다.
+- 배선: ⌃⌥D 토글, 좌클릭 그리기 start/end, ESC clear, `[ ]` 두께+영구화, Ctrl+Z undo, 모니터 변경 시 렌더러 재구성, 후킹 분실(T2) → `MouseHookLost`, 종료 시 설정 flush.
+- TODO(상태 이식 시 연결): 클릭/스크롤/트레일 효과, 링 외형(CursorSettings), 키스트로크 오버레이, 발표앱 감지 동작.
+
+**현재 171 tests green.** 다음 단계는 플랫폼 인터페이스의 **네이티브 구현**(Input/Render/Shell)으로, Windows 실행 환경(Parallels VM/미니PC)이 필요.
 
 ## 선행 게이트 (코드 본투자 전)
 
