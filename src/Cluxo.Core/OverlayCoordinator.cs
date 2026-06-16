@@ -133,11 +133,22 @@ public sealed class OverlayCoordinator : IDisposable
         lock (_gate) _drawing.LineWidth = _store.Get(LineWidthKey, Tokens.Drawing.LineWidth);
         ApplyRuntimeSettings(); // 캐시 채우기 + shake 민감도 적용
 
-        // ⌃⌥D → 그리기 모드 토글, ⌃⌥I → 좌표(inspector) 토글 (Mac과 동일 단축키)
-        _hotkeyRegs.Add(_hotkeys.Register(
-            new HotkeyChord(KeyModifiers.Control | KeyModifiers.Alt, "D"), ToggleDrawingMode));
-        _hotkeyRegs.Add(_hotkeys.Register(
-            new HotkeyChord(KeyModifiers.Control | KeyModifiers.Alt, "I"), ToggleInspector));
+        // 글로벌 단축키 — 맥 KeyboardHotkeyHandler와 동일 키(모두 ⌃⌥). 다른 앱과 충돌하는 키는
+        // 그 키만 건너뛰고 나머지는 등록(TryRegisterHotkey). 라디얼(⌃⌥,)은 Windows Terminal 충돌로
+        // 가운데 버튼이 대신한다.
+        TryRegisterHotkey("D", ToggleDrawingMode);   // 그리기 모드
+        TryRegisterHotkey("I", ToggleInspector);     // 좌표 표시
+        TryRegisterHotkey("S", ToggleSpotlight);     // 스포트라이트
+        TryRegisterHotkey("M", ToggleMagnifier);     // 돋보기
+        TryRegisterHotkey("K", ToggleKeystroke);     // 키 입력 표시
+        TryRegisterHotkey("C", CycleColor);          // 링 색 순환
+        TryRegisterHotkey("H", CycleRingShape);      // 링 모양 순환
+        // ⌃⌥1~7 → 색 직접 지정 (맥과 동일 순서: 노랑/빨강/파랑/초록/하늘/보라/흰).
+        for (int n = 0; n < ColorPalette.Length && n < 7; n++)
+        {
+            var color = ColorPalette[n];
+            TryRegisterHotkey(((char)('1' + n)).ToString(), () => SetRingColor(color));
+        }
 
         _mouse.ButtonDown += OnButtonDown;
         _mouse.ButtonUp += OnButtonUp;
@@ -484,6 +495,98 @@ public sealed class OverlayCoordinator : IDisposable
             _runtime.IsInspectorActive = !_runtime.IsInspectorActive;
             _keystrokes.ShowStatusNotification(
                 _runtime.IsInspectorActive ? "좌표 표시 ON" : "좌표 표시 OFF", now);
+        }
+    }
+
+    /// <summary>스포트라이트 토글 (⌃⌥S). 라디얼 sector 0과 동일 상태 — 렌더는 D2D 복구 후.</summary>
+    public void ToggleSpotlight()
+    {
+        double now = _clock.NowSeconds;
+        lock (_gate)
+        {
+            _runtime.IsSpotlightActive = !_runtime.IsSpotlightActive;
+            _keystrokes.ShowStatusNotification(
+                _runtime.IsSpotlightActive ? "스포트라이트 ON" : "스포트라이트 OFF", now);
+        }
+    }
+
+    /// <summary>돋보기 토글 (⌃⌥M). 라디얼 sector 1과 동일 상태 — 확대 렌더는 D2D 복구 후.</summary>
+    public void ToggleMagnifier()
+    {
+        double now = _clock.NowSeconds;
+        lock (_gate)
+        {
+            _runtime.IsMagnifierActive = !_runtime.IsMagnifierActive;
+            _keystrokes.ShowStatusNotification(
+                _runtime.IsMagnifierActive ? "돋보기 ON" : "돋보기 OFF", now);
+        }
+    }
+
+    /// <summary>키 입력 표시 토글 (⌃⌥K).</summary>
+    public void ToggleKeystroke()
+    {
+        double now = _clock.NowSeconds;
+        lock (_gate)
+        {
+            _settingsModel.IsKeystrokeEnabled = !_settingsModel.IsKeystrokeEnabled;
+            _keystrokes.ShowStatusNotification(
+                _settingsModel.IsKeystrokeEnabled ? "키 입력 표시 ON" : "키 입력 표시 OFF", now);
+        }
+    }
+
+    /// <summary>다음 링 색으로 순환 (⌃⌥C). 발표 중 빠른 색 변경.</summary>
+    public void CycleColor()
+    {
+        double now = _clock.NowSeconds;
+        lock (_gate)
+        {
+            int i = Array.IndexOf(ColorPalette, _settingsModel.RingColor);
+            var next = ColorPalette[((i < 0 ? 0 : i) + 1) % ColorPalette.Length];
+            _settingsModel.RingColor = next;
+            _keystrokes.ShowStatusNotification($"링 색 · {next.Label()}", now);
+        }
+    }
+
+    /// <summary>링 색 직접 지정 (⌃⌥1~7).</summary>
+    public void SetRingColor(RingColor color)
+    {
+        double now = _clock.NowSeconds;
+        lock (_gate)
+        {
+            _settingsModel.RingColor = color;
+            _keystrokes.ShowStatusNotification($"링 색 · {color.Label()}", now);
+        }
+    }
+
+    /// <summary>다음 링 모양으로 순환 (⌃⌥H).</summary>
+    public void CycleRingShape()
+    {
+        double now = _clock.NowSeconds;
+        lock (_gate)
+        {
+            var cases = Enum.GetValues<RingShape>();
+            int i = Array.IndexOf(cases, _settingsModel.RingShape);
+            var next = cases[((i < 0 ? 0 : i) + 1) % cases.Length];
+            _settingsModel.RingShape = next;
+            _keystrokes.ShowStatusNotification($"링 모양 · {next.Label()}", now);
+        }
+    }
+
+    /// <summary>커스텀 제외 링 색 팔레트 — 맥 ⌃⌥1~7 순서와 동일(enum 정의 순서).</summary>
+    private static readonly RingColor[] ColorPalette =
+        Enum.GetValues<RingColor>().Where(c => c != RingColor.Custom).ToArray();
+
+    /// <summary>⌃⌥{key} 핫키 등록 — 다른 앱과 충돌하면 그 키만 건너뛴다(예외 삼킴).</summary>
+    private void TryRegisterHotkey(string key, Action onPressed)
+    {
+        try
+        {
+            _hotkeyRegs.Add(_hotkeys.Register(
+                new HotkeyChord(KeyModifiers.Control | KeyModifiers.Alt, key), onPressed));
+        }
+        catch (Exception)
+        {
+            // 충돌(InvalidOperationException) 등 — 해당 단축키만 비활성, 나머지는 유지.
         }
     }
 

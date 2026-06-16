@@ -793,6 +793,49 @@ public class OverlayCoordinatorTests
     }
 
     [Fact]
+    public void SpotlightHotkey_Toggles()
+    {
+        var h = new Harness();
+        h.Coordinator.Start();
+        Assert.False(h.Coordinator.IsSpotlightActive);
+        h.Hotkeys.Press(new HotkeyChord(KeyModifiers.Control | KeyModifiers.Alt, "S"));
+        Assert.True(h.Coordinator.IsSpotlightActive);
+        h.Hotkeys.Press(new HotkeyChord(KeyModifiers.Control | KeyModifiers.Alt, "S"));
+        Assert.False(h.Coordinator.IsSpotlightActive);
+    }
+
+    [Fact]
+    public void ColorHotkey_NumberSetsColor_AndCycleAdvances()
+    {
+        var h = new Harness();
+        h.Coordinator.Start();
+        h.Cursor.Position = new PointD(100, 100); // 모니터 A
+        Rgba RingColorNow() { h.Coordinator.RenderFrame(); return h.Factory.Created["A"].Last!.Value.Ring!.Value.Color; }
+
+        // ⌃⌥1 → 첫 색(노란색), ⌃⌥3 → 파란색 (enum: Yellow,Red,Blue,...)
+        h.Hotkeys.Press(new HotkeyChord(KeyModifiers.Control | KeyModifiers.Alt, "1"));
+        Assert.Equal(RingColor.Yellow.Color(), RingColorNow());
+        h.Hotkeys.Press(new HotkeyChord(KeyModifiers.Control | KeyModifiers.Alt, "3"));
+        Assert.Equal(RingColor.Blue.Color(), RingColorNow());
+        // ⌃⌥C → 다음 색 순환 (Blue → Green)
+        h.Hotkeys.Press(new HotkeyChord(KeyModifiers.Control | KeyModifiers.Alt, "C"));
+        Assert.Equal(RingColor.Green.Color(), RingColorNow());
+    }
+
+    [Fact]
+    public void RingShapeHotkey_Cycles()
+    {
+        var h = new Harness();
+        h.Coordinator.Start();
+        h.Cursor.Position = new PointD(100, 100);
+        h.Coordinator.RenderFrame();
+        var start = h.Factory.Created["A"].Last!.Value.Ring!.Value.Shape; // Circle
+        h.Hotkeys.Press(new HotkeyChord(KeyModifiers.Control | KeyModifiers.Alt, "H"));
+        h.Coordinator.RenderFrame();
+        Assert.NotEqual(start, h.Factory.Created["A"].Last!.Value.Ring!.Value.Shape); // 다음 모양
+    }
+
+    [Fact]
     public void Inspector_Active_SetsFrameFlag()
     {
         var h = new Harness();
