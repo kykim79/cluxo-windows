@@ -16,9 +16,11 @@ macOS Cluxo(커서 강조 발표 도구)의 **네이티브 Windows 재구현**. 
 ## 빌드 / 테스트
 
 ```bash
-dotnet build      # 솔루션 빌드
+dotnet build      # 솔루션 빌드 (Cluxo.Core, 맥/윈도우 공통)
 dotnet test       # Cluxo.Core 단위 테스트
 ```
+
+네이티브 Windows 개발(Parallels VM 셋업·앱 프로젝트·인터페이스 구현): **[docs/WINDOWS-SETUP.md](docs/WINDOWS-SETUP.md)**
 
 ## Cluxo.Core 이식 진행 (Mac → C#)
 
