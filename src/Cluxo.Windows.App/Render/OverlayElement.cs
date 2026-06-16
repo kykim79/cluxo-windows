@@ -22,8 +22,11 @@ internal sealed class OverlayElement : FrameworkElement
     private readonly MonitorInfo _monitor;
     private readonly Func<double> _clock;
     private readonly Dictionary<int, double> _firstSeen = new(); // 효과 Id → 첫 등장 tick
+    private readonly RingSpring _ringSpring = new(Tokens.Motion.ReturnTo); // 클릭 squash → 1.0 복귀(§5.2)
     private OverlayFrame? _frame;
     private double _now;
+    private double _lastNow = -1;
+    private int _lastClickId; // 새 클릭 감지(효과 Id는 단조 증가)
 
     public OverlayElement(MonitorInfo monitor, Func<double> clock)
     {
@@ -36,7 +39,22 @@ internal sealed class OverlayElement : FrameworkElement
     {
         _frame = frame;
         _now = _clock();
+        double dt = _lastNow < 0 ? 0 : _now - _lastNow;
+        _lastNow = _now;
+
+        // 새 클릭 → 링 squash. 이후 매 프레임 스프링이 1.0으로 복귀.
+        int maxClick = MaxClickId(frame.Effects.Clicks);
+        if (maxClick > _lastClickId) { _ringSpring.Bump(); _lastClickId = maxClick; }
+        _ringSpring.Advance(dt);
+
         InvalidateVisual();
+    }
+
+    private static int MaxClickId(IReadOnlyList<ClickEffect> clicks)
+    {
+        int max = 0;
+        foreach (var c in clicks) if (c.Id > max) max = c.Id;
+        return max;
     }
 
     private Point ToLocal(PointD p)
@@ -155,7 +173,7 @@ internal sealed class OverlayElement : FrameworkElement
     private void DrawRing(DrawingContext dc, OverlayFrame f)
     {
         if (f.Ring is not { } ring || f.CursorPosition is not { } cursor) return;
-        double r = ring.Radius * ring.Scale;
+        double r = ring.Radius * ring.Scale * _ringSpring.Value; // 클릭 squash 스프링(§5.2)
         var c = ToLocal(cursor);
 
         // 글로우 — 커서 주위 은은한 후광(accent 라디얼 그라디언트). 링 외곽선 뒤에 그린다.
