@@ -87,3 +87,8 @@ Core 상태 + 플랫폼 인터페이스를 배선하는 중앙 조정자 (Mac `A
 
 고객사 환경에서 **설치·실행 가능 확인됨**(현장 판단). 외부 리뷰가 우려했던 "기업 IT가 마우스 훅 앱을 차단" 리스크(T4)는 해소.
 남은 건 게이트가 아니라 **패키징 선택**: 직접 배포(서명된 .exe/MSI) 우선, 코드사이닝(OV/EV)으로 SmartScreen 마찰 제거, Store는 추후.
+
+- 패키징·퍼블리시·코드사이닝: **[docs/PACKAGING.md](docs/PACKAGING.md)** (`scripts/publish.ps1`·`scripts/sign.ps1`)
+- 출시 전 실하드웨어 QA(멀티모니터·DPI·후킹·녹화): **[docs/QA-CHECKLIST.md](docs/QA-CHECKLIST.md)** (설계 T10)
+
+> **렌더 백엔드 메모**: 현재 오버레이는 WPF 투명 윈도우 **스톱갭**(이 개발 환경에서 Vortice NuGet 복원 불가). 설계의 DComp+Direct2D는 네트워크 되는 환경에서 `IOverlayRenderer` 구현만 교체.
