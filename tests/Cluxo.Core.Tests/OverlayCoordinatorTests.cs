@@ -198,6 +198,31 @@ public class OverlayCoordinatorTests
     }
 
     [Fact]
+    public void DrawDrag_InProgressShape_ShowsInFrame_BeforeCommit()
+    {
+        var h = new Harness();
+        h.Coordinator.Start();
+        h.EnterDrawingMode();
+
+        h.Mouse.Down(MouseButton.Left, new PointD(10, 10)); // StartShape — 아직 미커밋
+        h.Cursor.Position = new PointD(50, 50);
+        h.Coordinator.RenderFrame();                         // UpdateShape + 프레임에 라이브 프리뷰
+
+        // 커밋 전: DrawingShapes(커밋분)는 비었지만 프레임엔 진행 중 stroke가 보인다
+        Assert.Empty(h.Coordinator.DrawingShapes);
+        var live = h.Factory.Created["A"].Last!.Value.Shapes;
+        Assert.Single(live);
+        Assert.Contains(new PointD(10, 10), live[0].Points);
+        Assert.Contains(new PointD(50, 50), live[0].Points);
+
+        // 커밋 후: 1개만(라이브 프리뷰가 커밋분과 중복되지 않음 — CurrentShape=null)
+        h.Mouse.Up(MouseButton.Left, new PointD(50, 50));
+        h.Coordinator.RenderFrame();
+        Assert.Single(h.Coordinator.DrawingShapes);
+        Assert.Single(h.Factory.Created["A"].Last!.Value.Shapes);
+    }
+
+    [Fact]
     public void RenderFrame_CursorOnlyOnContainingMonitor()
     {
         var h = new Harness(Harness.MonA, Harness.MonB);

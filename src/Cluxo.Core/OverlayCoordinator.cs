@@ -193,7 +193,7 @@ public sealed class OverlayCoordinator : IDisposable
     private List<(IOverlayRenderer, OverlayFrame)> BuildFrames(PointD pos)
     {
         var branding = _branding.Current;
-        var shapes = _drawing.Shapes.ToArray(); // 렌더 스레드가 가변 리스트 안 보게 스냅샷
+        var shapes = SnapshotShapes(); // 커밋된 도형 + 진행 중 stroke 라이브 프리뷰(불변 스냅샷)
         string? keystroke = _keystrokes.IsVisible ? _keystrokes.KeystrokeText : null;
         var result = new List<(IOverlayRenderer, OverlayFrame)>(_renderers.Count);
 
@@ -227,6 +227,28 @@ public sealed class OverlayCoordinator : IDisposable
             result.Add((renderer, new OverlayFrame(monitor.Id, cursorHere, ring, shapes, branding, effects, keystroke, drag, radial)));
         }
         return result;
+    }
+
+    // 커밋된 도형 + (그리기 중이면) 진행 중 stroke를 불변 스냅샷으로. 진행 중 stroke를 포함해
+    // 드래그 도중에도 선이 보인다(라이브 프리뷰). EndShape 후엔 CurrentShape=null이라 중복 없음.
+    // CurrentShape는 매 프레임 변하므로 points를 복사해 렌더 스레드가 가변 리스트를 보지 않게 한다.
+    private IReadOnlyList<DrawingShape> SnapshotShapes()
+    {
+        var committed = _drawing.Shapes;
+        var current = _drawing.CurrentShape;
+        if (current is null) return committed.ToArray();
+
+        var result = new DrawingShape[committed.Count + 1];
+        for (int i = 0; i < committed.Count; i++) result[i] = committed[i];
+        result[committed.Count] = CopyShape(current);
+        return result;
+    }
+
+    private static DrawingShape CopyShape(DrawingShape s)
+    {
+        var copy = new DrawingShape(s.Tool, s.Color, s.LineWidth, s.Points[0], s.BadgeNumber);
+        for (int i = 1; i < s.Points.Count; i++) copy.Points.Add(s.Points[i]);
+        return copy;
     }
 
     // 설정값을 캐시로 반영 + shake 민감도 적용. Start와 설정 변경 시에만 호출(핫패스 아님).
