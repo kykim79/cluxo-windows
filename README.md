@@ -1,0 +1,42 @@
+# Cluxo for Windows
+
+macOS Cluxo(커서 강조 발표 도구)의 **네이티브 Windows 재구현**. 회사 코브랜딩 홍보용 배포를 목표로 한 별도 제품 — 오픈소스 Mac repo와 분리해 IP·라이선스를 깨끗하게 유지한다.
+
+설계·전략 전체: `~/.gstack/projects/kykim79-Cluxo/ktoy-main-design-20260616-145510.md`
+(office-hours → plan-eng-review → plan-ceo-review 통과, 2026-06-16)
+
+## 아키텍처 (요약)
+
+- **언어/스택**: C# (.NET 8) + Win32 P/Invoke + Vortice.Windows(로우레벨 Direct2D) 예정.
+- **계층**:
+  - `Cluxo.Core` — 플랫폼 무관 순수 로직 (xUnit 100% 목표). Mac의 static 순수함수 패턴 이식. 훗날 공유 코어(Approach C) 씨앗.
+  - Input / Render / Shell — 네이티브 Windows 계층 (예정).
+- **v1 스코프**: 커서 강조 링·클릭 스포트라이트·키스트로크 오버레이·라디얼 메뉴·그리기/주석 모드·흔들기로 찾기·코브랜딩. 제외: 트랙패드 제스처(강제), 돋보기(v1.1).
+
+## 빌드 / 테스트
+
+```bash
+dotnet build      # 솔루션 빌드
+dotnet test       # Cluxo.Core 단위 테스트
+```
+
+## Cluxo.Core 이식 진행 (Mac → C#)
+
+| 모듈 | 상태 | 비고 |
+|------|------|------|
+| ShakeState | ✅ 이식·테스트(17) | 시간 주입, 축별 독립 추적, 0.5초 dedup |
+| DragAngleLabel / DragAngleAccumulator | ✅ 이식·테스트(28) | ±π wrapping, 8방향 화살표(away-from-zero 반올림) |
+| RadialHitTest | ✅ 이식·테스트(11) | 거리/각도 → sector/sub/subSub, lock 유지. contentSpan 테스트는 CursorSettings 이식 때로 미룸 |
+| KeyFormat | ✅ 이식·테스트(13) | 게이트(Ctrl/Alt/Win 필수)·순서·특수키 불변식 보존. 글리프는 Windows 관례(디자인 리뷰서 확정), VK 매핑은 플랫폼 계층 |
+| DrawingState | ✅ 이식·테스트(48) | 7개 도구·모디파이어 매핑(Cmd→Ctrl/Opt→Alt)·두께 단계·undo·툴바 hit-test. onboarding은 UI 계층 |
+| JsonSettingsStore (Persisted) | ✅ 이식·테스트(7) | %APPDATA% JSON 영구화. 기본값/손상 fallback·라운드트립. 파일IO·디바운스는 플랫폼 계층 |
+| BrandingConfig | ✅ 이식·테스트(11) | 코브랜딩 런타임 주입 + HMAC 무결성(변조/미서명 → 순정 fallback). 외부보이스 P1(T3) |
+
+추가 Core 타입: `PointD`/`RectD`/`Rgba`(Primitives), `Tokens.Drawing`(DESIGN.md 미러), `KeyModifiers`/`SpecialKey`.
+
+**Cluxo.Core v1 순수 로직 이식 완료 — 135 tests green.** (GestureClassifier는 설계대로 제외: Windows에 raw 터치 입력원 없음.)
+다음 단계는 네이티브 계층(Input/Render/Shell)으로, Windows 실행 환경(Parallels VM/미니PC)이 필요.
+
+## 선행 게이트 (코드 본투자 전)
+
+**T4 — 파일럿 고객사 IT가 마우스 훅 앱 설치를 허용하는지 먼저 확인.** 막히면 GTM 자체가 막힌다.
