@@ -1,0 +1,47 @@
+name: Windows App Build
+
+# Cluxo.Windows.App(net8.0-windows, 네이티브)은 windows runner에서만 빌드된다.
+# 아직 프로젝트가 없으면(VM에서 생성 전) 트리거되지 않는다 — paths 필터 + 수동 dispatch.
+# 설계 T9: 빌드 + (추후) MSIX 패키징 + 코드사이닝.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/Cluxo.Windows.App/**'
+      - 'Cluxo.Windows.sln'
+      - '.github/workflows/windows-app.yml'
+  workflow_dispatch: {}   # 수동 실행 (프로젝트 생성 후 즉시 검증용)
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Guard — 윈도우 솔루션 존재 확인
+        shell: pwsh
+        run: |
+          if (-not (Test-Path 'Cluxo.Windows.sln')) {
+            Write-Host '::notice::Cluxo.Windows.sln 없음 — 네이티브 앱 생성 전. 스킵.'
+            exit 0
+          }
+
+      - name: Build (Release)
+        if: hashFiles('Cluxo.Windows.sln') != ''
+        run: dotnet build Cluxo.Windows.sln --configuration Release
+
+      - name: Test (Core, windows에서도 green 확인)
+        if: hashFiles('Cluxo.Windows.sln') != ''
+        run: dotnet test Cluxo.Windows.sln --configuration Release --no-build
+
+      # ── TODO (T9 — 배포 단계) ─────────────────────────────────
+      # - 코드사이닝: signtool.exe (OV/EV 인증서를 GitHub secret으로). SmartScreen 마찰 제거.
+      # - MSIX 패키징: makeappx.exe 또는 .wapproj. 추후 Store 등록(설계상 직접배포 우선).
+      # - RID: win-x64 / win-arm64 publish 결정. 아티팩트 업로드(actions/upload-artifact).
+      # - 인증서·키는 repo secret으로만(평문 커밋 금지).

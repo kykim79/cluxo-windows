@@ -1,0 +1,30 @@
+name: Core CI
+
+# Cluxo.Core(플랫폼 무관 net8.0)는 ubuntu에서 빌드·테스트한다 — 빠르고 저렴.
+# 매 push/PR마다 266개 단위 테스트를 게이트한다.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore
+        run: dotnet restore Cluxo.sln
+
+      - name: Build (Release)
+        run: dotnet build Cluxo.sln --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test Cluxo.sln --configuration Release --no-build --verbosity normal

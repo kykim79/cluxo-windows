@@ -22,6 +22,8 @@ dotnet test       # Cluxo.Core 단위 테스트
 
 네이티브 Windows 개발(Parallels VM 셋업·앱 프로젝트·인터페이스 구현): **[docs/WINDOWS-SETUP.md](docs/WINDOWS-SETUP.md)**
 
+**CI**: `core-ci`(ubuntu, 매 push에 Core 266 테스트 게이트) + `windows-app`(windows-latest, 네이티브 앱 생성 후 자동·수동). `.github/workflows/`
+
 ## Cluxo.Core 이식 진행 (Mac → C#)
 
 | 모듈 | 상태 | 비고 |
