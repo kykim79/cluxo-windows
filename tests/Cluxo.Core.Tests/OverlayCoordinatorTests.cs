@@ -746,4 +746,18 @@ public class OverlayCoordinatorTests
         h.Coordinator.RenderFrame();
         Assert.Equal("좌표 표시 ON", h.Coordinator.Keystroke);
     }
+
+    [Fact]
+    public void Inspector_Active_SetsFrameFlag()
+    {
+        var h = new Harness();
+        h.Coordinator.Start();
+        h.Cursor.Position = new PointD(100, 100); // 모니터 A
+        h.Coordinator.RenderFrame();
+        Assert.False(h.Factory.Created["A"].Last!.Value.Inspector); // 기본 OFF
+
+        h.Hotkeys.Press(new HotkeyChord(KeyModifiers.Control | KeyModifiers.Alt, "I")); // 토글 ON
+        h.Coordinator.RenderFrame();
+        Assert.True(h.Factory.Created["A"].Last!.Value.Inspector);
+    }
 }

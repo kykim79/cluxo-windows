@@ -91,6 +91,7 @@ internal sealed class OverlayElement : FrameworkElement
         DrawShapes(dc, f);
         DrawRadial(dc, f, accent);
 
+        DrawInspector(dc, f, accent);
         DrawKeystroke(dc, f);
         DrawBranding(dc, f);
     }
@@ -273,13 +274,23 @@ internal sealed class OverlayElement : FrameworkElement
         }
     }
 
+    // ── inspector 좌표 라벨 (⌃⌥I) — 커서 옆에 전역 좌표 ──────────
+    private void DrawInspector(DrawingContext dc, OverlayFrame f, Rgba accent)
+    {
+        if (!f.Inspector || f.CursorPosition is not { } cur) return;
+        var at = ToLocal(cur);
+        DrawLabelCard(dc, $"x {(int)Math.Round(cur.X)}   y {(int)Math.Round(cur.Y)}",
+            new Point(at.X + 18, at.Y + 18), accent, mono: true);
+    }
+
     // 작은 라벨 카드(어두운 배경 + accent 텍스트) — 좌상단 기준점.
-    private void DrawLabelCard(DrawingContext dc, string text, Point topLeft, Rgba accent)
+    private void DrawLabelCard(DrawingContext dc, string text, Point topLeft, Rgba accent, bool mono = false)
     {
         double ppd = _monitor.DpiScale <= 0 ? 1.0 : _monitor.DpiScale;
+        var typeface = new Typeface(new FontFamily(mono ? "Consolas" : "Segoe UI"),
+            FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal);
         var ft = new FormattedText(text, CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
-            new Typeface(new FontFamily("Segoe UI"), FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal),
-            (double)Tokens.Text.Caption.Size, MakeBrush(accent, 1.0), ppd);
+            typeface, (double)Tokens.Text.Caption.Size, MakeBrush(accent, 1.0), ppd);
         double padX = Tokens.Spacing.Sm, padY = Tokens.Spacing.Xs;
         var rect = new Rect(topLeft.X, topLeft.Y, ft.Width + padX * 2, ft.Height + padY * 2);
         dc.DrawRoundedRectangle(MakeBrush(Tokens.Surface.Panel, 1.0), null, rect, Tokens.Radius.Sm, Tokens.Radius.Sm);

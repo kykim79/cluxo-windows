@@ -264,7 +264,8 @@ public sealed class OverlayCoordinator : IDisposable
                 ? new RadialVisual(_runtime.IsRadialMenuVisible, _runtime.RadialMenuCenter,
                     _runtime.RadialMenuSelectedSector, _runtime.RadialMenuSelectedSubItem, _runtime.RadialMenuSelectedSubSubItem)
                 : null;
-            result.Add((renderer, new OverlayFrame(monitor.Id, cursorHere, ring, shapes, branding, effects, keystroke, drag, radial)));
+            result.Add((renderer, new OverlayFrame(monitor.Id, cursorHere, ring, shapes, branding, effects, keystroke, drag, radial,
+                _runtime.IsInspectorActive)));
         }
         return result;
     }

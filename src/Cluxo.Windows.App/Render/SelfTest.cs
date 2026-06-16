@@ -218,7 +218,7 @@ internal static class SelfTest
         var branding = new BrandingConfig { CompanyName = "Acme Corp", AccentColor = new Rgba(255, 150, 40) };
 
         return new OverlayFrame("M", new PointD(120, 110), ring, Array.Empty<DrawingShape>(),
-            branding, effects, "Ctrl+Alt+D", drag, radial);
+            branding, effects, "Ctrl+Alt+D", drag, radial, Inspector: true);
     }
 
     private static OverlayFrame BuildShapeFrame()

@@ -64,7 +64,8 @@ public readonly record struct OverlayFrame(
     OverlayEffects Effects = default,        // 일시적 효과(모니터별 필터)
     string? Keystroke = null,                // 키스트로크 오버레이 텍스트(보이는 동안만, 렌더가 배치)
     DragVisual? Drag = null,                 // 드래그 시각 힌트(커서 있는 모니터만)
-    RadialVisual? Radial = null              // 라디얼 메뉴(중심 있는 모니터만)
+    RadialVisual? Radial = null,             // 라디얼 메뉴(중심 있는 모니터만)
+    bool Inspector = false                   // ⌃⌥I 좌표 표시(커서 있는 모니터가 좌표 라벨 렌더)
 );
 
 /// <summary>
