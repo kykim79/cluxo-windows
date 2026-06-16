@@ -29,6 +29,11 @@ internal static class Program
             Environment.Exit(SelfTest.RunFx());
             return;
         }
+        if (args.Length > 0 && args[0] == "--selftest-radial")
+        {
+            Environment.Exit(SelfTest.RunRadial());
+            return;
+        }
 
         using var input = new Win32InputLayer();
         using var shell = new Win32ShellLayer("Cluxo");

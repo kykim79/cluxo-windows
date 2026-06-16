@@ -200,33 +200,81 @@ internal sealed class OverlayElement : FrameworkElement
         if (f.Radial is not { } radial || !radial.Visible) return;
         var center = ToLocal(radial.Center);
         double dead = Tokens.Radial.DeadRadius, main = Tokens.Radial.MainOuter;
+        double sub = Tokens.Radial.SubOuter, subSub = Tokens.Radial.SubSubOuter;
 
-        // 배경 veil + 가이드 원 (라벨 가독성)
-        dc.DrawEllipse(MakeBrush(Tokens.Surface.Veil, 1.0), StrokePen(Rgba.FromWhite(0.22), 1.5, 1.0), center, main, main);
+        // 활성 깊이까지 veil 배경 + 가이드 원 (라벨 가독성).
+        double outer = radial.SubSub is { } ? subSub : radial.Sub is { } ? sub : main;
+        dc.DrawEllipse(MakeBrush(Tokens.Surface.Veil, 1.0), StrokePen(Rgba.FromWhite(0.22), 1.5, 1.0), center, outer, outer);
         dc.DrawEllipse(null, StrokePen(Rgba.FromWhite(0.25), 1.5, 1.0), center, dead, dead);
+        if (radial.Sub is { }) dc.DrawEllipse(null, StrokePen(Rgba.FromWhite(0.15), 1.0, 1.0), center, main, main);
 
-        // 선택 sector wedge 강조. 코디네이터 dy 반전 후 sector i 화면각 β = i*45-90(12시=sector0, 시계방향).
+        // 선택 sector wedge 강조. dy 반전 후 화면각 β = cw - 90 (cw: 12시=0, 시계방향).
         if (radial.Sector is { } sel)
-        {
-            double aLow = sel * 45.0 - 112.5, aHigh = sel * 45.0 - 67.5; // β ± 22.5
             dc.DrawGeometry(MakeBrush(accent, 0.30), StrokePen(accent, 2, 0.9),
-                PieWedge(center, dead, main, aLow, aHigh));
-        }
+                PieWedge(center, dead, main, sel * 45.0 - 112.5, sel * 45.0 - 67.5));
 
-        // 8개 메인 sector 라벨 (RadialMenu 트리). sub/subSub fan 라벨은 후속.
-        double labelR = (dead + main) / 2;
+        // (1) 8개 메인 sector 라벨 — cw = i*45.
+        double mainR = (dead + main) / 2;
         for (int i = 0; i < 8; i++)
         {
-            double beta = (i * 45.0 - 90.0) * Math.PI / 180.0;
-            var pos = new Point(center.X + labelR * Math.Cos(beta), center.Y + labelR * Math.Sin(beta));
             bool selected = radial.Sector == i;
-            DrawCenteredText(dc, ((RadialMenuItem)i).Label(), pos, (double)Tokens.Text.CaptionSmall.Size,
-                selected ? Rgba.FromWhite(0.98) : Rgba.FromWhite(0.55), bold: selected);
+            DrawCenteredText(dc, ((RadialMenuItem)i).Label(), Polar(center, mainR, i * 45.0),
+                (double)Tokens.Text.CaptionSmall.Size,
+                selected ? Rgba.FromWhite(0.98) : Rgba.FromWhite(0.45), bold: selected);
         }
 
-        // 중앙: 선택 sector 라벨(없으면 힌트)
+        // (2) 잠긴 sector의 sub fan — cursor가 sub ring 이상이면(Sub 선택됨).
+        if (radial.Sector is { } sct && radial.Sub is { })
+        {
+            var item = (RadialMenuItem)sct;
+            var subs = item.SubItems();
+            double subSpan = item.SubSpan();
+            DrawFan(dc, center, (main + sub) / 2, centerCw: sct * 45.0, span: subSpan,
+                Labels(subs), radial.Sub, accent);
+
+            // (3) branch sub의 subSub fan.
+            if (radial.SubSub is { } && radial.Sub is { } subIdx
+                && subIdx < subs.Count && subs[subIdx].Children is { Count: > 0 } kids)
+            {
+                double subCenter = RadialHitTest.SubCenterAngle(sct, subIdx, subSpan, subs.Count);
+                DrawFan(dc, center, (sub + subSub) / 2, subCenter, item.SubSubSpan(subIdx),
+                    Labels(kids), radial.SubSub, accent);
+            }
+        }
+
+        // 중앙: 선택 sector 라벨(없으면 힌트).
         string centerText = radial.Sector is { } cs ? ((RadialMenuItem)cs).Label() : "···";
         DrawCenteredText(dc, centerText, center, (double)Tokens.Text.Label.Size, accent, bold: true);
+    }
+
+    // centerCw 기준 span을 count칸으로 펼친 라벨 fan. (RadialHitTest.FanIndex와 동일 기하)
+    private void DrawFan(DrawingContext dc, Point center, double radius, double centerCw, double span,
+        IReadOnlyList<string> labels, int? selected, Rgba accent)
+    {
+        int n = labels.Count;
+        if (n == 0) return;
+        double step = span / n, start = centerCw - span / 2;
+        for (int i = 0; i < n; i++)
+        {
+            double cw = start + step * (i + 0.5);
+            bool sel = selected == i;
+            DrawCenteredText(dc, labels[i], Polar(center, radius, cw), (double)Tokens.Text.Caption.Size,
+                sel ? accent : Rgba.FromWhite(0.55), bold: sel);
+        }
+    }
+
+    private static IReadOnlyList<string> Labels(IReadOnlyList<RadialSubItem> items)
+    {
+        var r = new string[items.Count];
+        for (int i = 0; i < items.Count; i++) r[i] = items[i].Label;
+        return r;
+    }
+
+    // cw 각도(12시=0, 시계방향) + 반지름 → 화면 점. 화면각 β = cw - 90.
+    private static Point Polar(Point center, double radius, double cwDeg)
+    {
+        double b = (cwDeg - 90.0) * Math.PI / 180.0;
+        return new Point(center.X + radius * Math.Cos(b), center.Y + radius * Math.Sin(b));
     }
 
     private void DrawCenteredText(DrawingContext dc, string text, Point center, double size, Rgba color, bool bold)

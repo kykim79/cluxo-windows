@@ -93,6 +93,36 @@ internal static class SelfTest
         return 0;
     }
 
+    /// <summary>라디얼 메뉴(main + sub + subSub fan 라벨) 렌더 → PNG. Spotlight→반경→140pt 선택 경로.</summary>
+    public static int RunRadial()
+    {
+        const int S = 520;
+        double now = 0.2;
+        var monitor = new MonitorInfo("M", new RectD(0, 0, S, S), 1.0, true);
+        var el = new OverlayElement(monitor, () => now);
+
+        var radial = new RadialVisual(Visible: true, Center: new PointD(S / 2.0, S / 2.0),
+            Sector: 0, Sub: 1, SubSub: 2); // Spotlight → 반경(branch) → 140pt
+        var frame = new OverlayFrame("M", null, null, Array.Empty<DrawingShape>(),
+            BrandingConfig.Default, OverlayEffects.Empty, null, null, radial);
+        el.SetFrame(frame);
+
+        var border = new Border { Width = S, Height = S, Background = new SolidColorBrush(Color.FromRgb(30, 30, 34)), Child = el };
+        border.Measure(new Size(S, S));
+        border.Arrange(new Rect(0, 0, S, S));
+        border.UpdateLayout();
+
+        var rtb = new RenderTargetBitmap(S, S, 96, 96, PixelFormats.Pbgra32);
+        rtb.Render(border);
+
+        string png = Path.Combine(Path.GetTempPath(), "cluxo-selftest-radial.png");
+        var enc = new PngBitmapEncoder();
+        enc.Frames.Add(BitmapFrame.Create(rtb));
+        using (var fs = File.Create(png)) enc.Save(fs);
+        File.WriteAllText(Path.Combine(Path.GetTempPath(), "cluxo-selftest-radial.txt"), $"png={png}\n");
+        return 0;
+    }
+
     private static OverlayFrame BuildFxFrame()
     {
         var accent = new Rgba(0, 230, 255);
