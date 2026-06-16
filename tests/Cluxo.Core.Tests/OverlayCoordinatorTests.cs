@@ -413,6 +413,34 @@ public class OverlayCoordinatorTests
     }
 
     [Fact]
+    public void Trail_ClearedWhenRadialOpens() // 잔상 잔존 버그 회귀 방지
+    {
+        var h = new Harness();
+        h.Settings.Store.Set("isTrailEnabled", true);
+        h.Coordinator.Start();
+        foreach (var x in new[] { 100, 130, 160 }) { h.Cursor.Position = new PointD(x, 100); h.Coordinator.RenderFrame(); }
+        Assert.NotEmpty(h.Factory.Created["A"].Last!.Value.Effects.Trail);
+
+        h.Radial.Open();             // 라디얼 진입 → 트레일 갱신 중단
+        h.Coordinator.RenderFrame(); // 다음 프레임에 즉시 비워져야 함
+        Assert.Empty(h.Factory.Created["A"].Last!.Value.Effects.Trail);
+    }
+
+    [Fact]
+    public void Trail_ClearedWhenDisabledMidStream()
+    {
+        var h = new Harness();
+        h.Settings.Store.Set("isTrailEnabled", true);
+        h.Coordinator.Start();
+        foreach (var x in new[] { 100, 130, 160 }) { h.Cursor.Position = new PointD(x, 100); h.Coordinator.RenderFrame(); }
+        Assert.NotEmpty(h.Factory.Created["A"].Last!.Value.Effects.Trail);
+
+        h.Coordinator.Settings.IsTrailEnabled = false; // 런타임 비활성(설정 모델 → 캐시 갱신)
+        h.Coordinator.RenderFrame();
+        Assert.Empty(h.Factory.Created["A"].Last!.Value.Effects.Trail);
+    }
+
+    [Fact]
     public void Scroll_Disabled_NoEffect()
     {
         var h = new Harness();

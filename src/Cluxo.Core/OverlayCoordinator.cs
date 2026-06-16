@@ -201,7 +201,6 @@ public sealed class OverlayCoordinator : IDisposable
                 {
                     // 일시적 효과는 그리기 모드에선 억제(오버레이가 annotation 전용). 각 효과는 설정 토글로 게이트.
                     if (shook && _shakeEnabled) _effects.AddShake(pos, now, _animationSpeed);
-                    if (_trailEnabled) _effects.UpdateTrail(pos);
                     if (_leftDown)
                     {
                         if (_cometTailEnabled) _effects.UpdateDragTrail(pos); // 비-그리기 드래그 streak(코멧)
@@ -234,6 +233,13 @@ public sealed class OverlayCoordinator : IDisposable
                     }
                 }
             }
+
+            // 트레일 — 활성 + 비-그리기 + 비-라디얼일 때만 샘플. 그 외(모드 진입/비활성)엔 즉시 비운다.
+            // (전엔 비-그리기 분기에서만 갱신해, 라디얼·그리기 진입 시 링버퍼가 얼어붙어 일부가 잔존했다.)
+            if (_trailEnabled && !_drawing.IsDrawingModeActive && !_runtime.IsRadialMenuActive)
+                _effects.UpdateTrail(pos);
+            else if (_effects.Trail.Count > 0)
+                _effects.ClearTrail();
 
             _effects.Prune(now);   // 만료 효과 + 드래그 trail fade 진행
             _keystrokes.Tick(now); // 키스트로크 오버레이 자동 숨김
