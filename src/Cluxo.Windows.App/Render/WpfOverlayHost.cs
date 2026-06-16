@@ -1,0 +1,91 @@
+using System.Windows;
+using System.Windows.Threading;
+using Cluxo.Core.Platform;
+
+namespace Cluxo.Windows.App.Render;
+
+/// <summary>
+/// WPF 오버레이 호스트 — 전용 STA 스레드 + Dispatcher 위에서 모니터별 오버레이 윈도우를 띄우고
+/// ~60Hz 렌더 루프로 <c>coordinator.RenderFrame()</c>을 구동한다(OVERLAY-RENDER.md §3).
+///
+/// 스레드 모델: 코디네이터의 RenderFrame이 이 UI 스레드(렌더 타이머)에서 돌아 renderer.Render가
+/// 같은 스레드에서 WPF 비주얼을 직접 갱신한다. factory.Create/renderer.Dispose는 다른 스레드에서
+/// 와도 Dispatcher로 마샬링한다.
+///
+/// 종료 순서(Program): StopRenderLoop() → coordinator.Dispose() → host.Dispose(). 렌더 루프를 먼저
+/// 멈춰야 UI 스레드가 coordinator._gate를 다투지 않는다(Dispose 데드락 회피).
+/// </summary>
+public sealed class WpfOverlayHost : IDisposable
+{
+    private readonly Thread _thread;
+    private Dispatcher _dispatcher = null!;
+    private Application? _app;
+    private readonly ManualResetEventSlim _ready = new(false);
+    private readonly List<WpfOverlayRenderer> _renderers = new();
+    private DispatcherTimer? _timer;
+    private Func<bool>? _capturesInput;
+    private bool _lastCapturesInput;
+    private bool _disposed;
+
+    public IOverlayRendererFactory Factory { get; }
+
+    public WpfOverlayHost(Func<double> clock)
+    {
+        _thread = new Thread(UiThread) { Name = "Cluxo.Overlay", IsBackground = true };
+        _thread.SetApartmentState(ApartmentState.STA);
+        _thread.Start();
+        _ready.Wait();
+        Factory = new WpfOverlayRendererFactory(_dispatcher, clock, Track, Untrack);
+    }
+
+    private void UiThread()
+    {
+        _app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
+        _dispatcher = Dispatcher.CurrentDispatcher;
+        _ready.Set();
+        _app.Run(); // 디스패처 펌프 — Shutdown까지 블록
+    }
+
+    private void Track(WpfOverlayRenderer r) { lock (_renderers) _renderers.Add(r); }
+    private void Untrack(WpfOverlayRenderer r) { lock (_renderers) _renderers.Remove(r); }
+
+    /// <summary>
+    /// UI 스레드에서 ~60Hz로 renderFrame 구동. capturesInput을 주면 그리기/라디얼 모드에서
+    /// 클릭통과를 끈다(P1, 상태 변경 시에만 토글).
+    /// </summary>
+    public void StartRenderLoop(Action renderFrame, Func<bool>? capturesInput = null)
+    {
+        _capturesInput = capturesInput;
+        _dispatcher.Invoke(() =>
+        {
+            _timer = new DispatcherTimer(DispatcherPriority.Render) { Interval = TimeSpan.FromMilliseconds(16) };
+            _timer.Tick += (_, _) =>
+            {
+                ApplyClickThrough();
+                renderFrame();
+            };
+            _timer.Start();
+        });
+    }
+
+    private void ApplyClickThrough()
+    {
+        if (_capturesInput is null) return;
+        bool captures = _capturesInput();
+        if (captures == _lastCapturesInput) return; // 변경 시에만(매 프레임 SetWindowLong 회피)
+        _lastCapturesInput = captures;
+        lock (_renderers)
+            foreach (var r in _renderers) r.SetClickThrough(!captures);
+    }
+
+    public void StopRenderLoop() => _dispatcher.Invoke(() => _timer?.Stop());
+
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+        _dispatcher.Invoke(() => { _timer?.Stop(); _app?.Shutdown(); });
+        _thread.Join(2000);
+        _ready.Dispose();
+    }
+}

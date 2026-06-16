@@ -1,3 +1,4 @@
+using System.IO;
 using System.Text;
 using Cluxo.Core.Platform;
 using SN = Cluxo.Windows.App.Shell.ShellNativeMethods;
