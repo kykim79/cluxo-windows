@@ -32,9 +32,11 @@ dotnet test       # Cluxo.Core 단위 테스트
 | JsonSettingsStore (Persisted) | ✅ 이식·테스트(7) | %APPDATA% JSON 영구화. 기본값/손상 fallback·라운드트립. 파일IO·디바운스는 플랫폼 계층 |
 | BrandingConfig | ✅ 이식·테스트(11) | 코브랜딩 런타임 주입 + HMAC 무결성(변조/미서명 → 순정 fallback). 외부보이스 P1(T3) |
 
-추가 Core 타입: `PointD`/`RectD`/`Rgba`(Primitives), `Tokens.Drawing`(DESIGN.md 미러), `KeyModifiers`/`SpecialKey`.
+| Tokens (DESIGN.md 전체) | ✅ 이식·테스트(19) | Surface/Stroke/Motion/Radial/Radius/Spacing/Drawing/Text 전체. SwiftUI 타입→플랫폼 무관 데이터 |
 
-**Cluxo.Core v1 순수 로직 이식 완료 — 135 tests green.** (GestureClassifier는 설계대로 제외: Windows에 raw 터치 입력원 없음.)
+추가 Core 타입: `PointD`/`RectD`/`Rgba`(+opacity 팩토리·needsDarkText), `Spring`/`Ease`/`FontToken`(Visuals), `KeyModifiers`/`SpecialKey`.
+
+**Cluxo.Core v1 순수 로직 + 디자인 토큰 이식 완료 — 154 tests green.** (GestureClassifier는 설계대로 제외: Windows에 raw 터치 입력원 없음.)
 다음 단계는 네이티브 계층(Input/Render/Shell)으로, Windows 실행 환경(Parallels VM/미니PC)이 필요.
 
 ## 선행 게이트 (코드 본투자 전)
