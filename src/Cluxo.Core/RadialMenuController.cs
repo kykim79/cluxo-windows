@@ -53,6 +53,37 @@ public sealed class RadialMenuController
         _runtime.RadialMenuSelectedSubSubItem = hit.SubSub;
     }
 
+    /// <summary>
+    /// 클릭 커밋 — 맥 handleRadialMenuClick 대응. 현재 선택을 실행하되 <b>메뉴는 유지</b>(연속 토글).
+    /// 반환값 false면 호출측이 <see cref="Close"/>를 불러 닫아야 한다.
+    ///   • 섹터 없음(중앙 dead zone ✕ / 바깥) → 실행 없이 false(닫기).
+    ///   • branch만 선택, subSub 미진입 → 무효(더 끌어 자식 선택 유도), true(유지).
+    ///   • leaf / subSub / 서브 없는 섹터 메인 → 실행, true(유지).
+    /// </summary>
+    public bool Commit()
+    {
+        if (!_runtime.IsRadialMenuActive) return false;
+        if (_runtime.RadialMenuSelectedSector is not { } si) return false; // 중앙/바깥 → 닫기
+
+        var item = (RadialMenuItem)si;
+        if (_runtime.RadialMenuSelectedSubItem is { } sub)
+        {
+            var subs = item.SubItems();
+            if (_runtime.RadialMenuSelectedSubSubItem is { } subSub)
+                Execute(si, sub, subSub);                 // 2단계: 자식 값
+            else if (sub < subs.Count && subs[sub].IsBranch)
+                return true;                              // branch만 선택 → 무효, 유지
+            else
+                Execute(si, sub, null);                   // 1단계: leaf 즉시 실행
+        }
+        else if (item.SubCount() == 0)
+        {
+            Execute(si, null, null);                      // 서브 없는 섹터만 메인 클릭으로 실행
+        }
+        // 그 외(서브 있는 섹터인데 sub 미선택)는 맥처럼 아무 동작 없이 유지
+        return true;
+    }
+
     /// <summary>chord 떼임 — 현재 선택 액션 실행(dead zone/바깥이면 취소) 후 닫기.</summary>
     public void Close()
     {

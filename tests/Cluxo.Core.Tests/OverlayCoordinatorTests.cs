@@ -682,24 +682,27 @@ public class OverlayCoordinatorTests
     }
 
     [Fact]
-    public void MiddleClick_SecondClick_Closes()
+    public void MiddleClick_SecondClickOnCenter_Closes()
     {
         var h = new Harness();
         h.Coordinator.Start();
         h.Mouse.Down(MouseButton.Middle, new PointD(100, 100));
         h.Mouse.Up(MouseButton.Middle, new PointD(100, 100));   // 열고 유지
-        h.Mouse.Down(MouseButton.Middle, new PointD(100, 200)); // 다시 클릭 → 실행+닫힘
+        h.Mouse.Down(MouseButton.Middle, new PointD(100, 100)); // 중앙 dead zone(✕) 클릭 → 닫힘
         Assert.False(h.Coordinator.IsRadialMenuActive);
     }
 
     [Fact]
-    public void Middle_PressDragRelease_Closes()
+    public void MiddleClick_OnItem_ExecutesAndStaysOpen()
     {
         var h = new Harness();
         h.Coordinator.Start();
-        h.Mouse.Down(MouseButton.Middle, new PointD(100, 100)); // 열림
-        h.Mouse.Up(MouseButton.Middle, new PointD(170, 100));   // 눌린 지점서 벗어나 떼기(마킹) → 닫힘
-        Assert.False(h.Coordinator.IsRadialMenuActive);
+        h.Mouse.Down(MouseButton.Middle, new PointD(100, 100)); // 열림(center=(100,100))
+        h.Mouse.Up(MouseButton.Middle, new PointD(100, 100));
+        // 12시 위쪽 sub 링(거리 130, MainOuter 102~SubOuter 174) — sector 0(스포트라이트) sub 클릭.
+        // 맥처럼 실행하되 메뉴는 유지(연속 토글 가능).
+        h.Mouse.Down(MouseButton.Middle, new PointD(100, -30));
+        Assert.True(h.Coordinator.IsRadialMenuActive); // 메뉴 유지
     }
 
     [Fact]

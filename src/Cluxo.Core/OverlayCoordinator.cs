@@ -56,11 +56,8 @@ public sealed class OverlayCoordinator : IDisposable
     private double _lastDragTime;
 
     // 가운데 버튼 라디얼 트리거 (키 chord 앱 충돌 회피용). 가운데 버튼은 후킹에서 흡수.
-    // 모델: 클릭으로 열어 유지(맥식) + 다시 클릭/가운데=닫기. 눌러 끌어 떼면 한 번에 선택(마킹).
+    // 모델(맥 클릭): 가운데 클릭으로 열어 유지 → leaf 클릭=실행+유지(연속 토글), 중앙 ✕/바깥 클릭=닫기.
     private bool _radialByMiddle;
-    private bool _midOpenedThisPress; // 직전 누름이 메뉴를 열었나(press-drag-release 판정용)
-    private PointD _midDownPos;
-    private const double MiddleMoveDeadband = 6; // 누른 뒤 이 이상 이동하면 마킹 제스처로 간주
 
     // 설정 캐시 — 60Hz 핫패스에서 매 프레임 store를 읽지 않게 ApplyRuntimeSettings에서만 갱신.
     private Rgba _activeColor = RingColor.Cyan.Color();
@@ -393,24 +390,25 @@ public sealed class OverlayCoordinator : IDisposable
         double now = _clock.NowSeconds;
         lock (_gate)
         {
-            // 가운데 버튼 — 라디얼 토글(클릭으로 열고 유지, 다시 클릭/가운데=닫기). 앱으론 후킹이 흡수.
+            // 가운데 버튼 — 라디얼 토글(맥 클릭 모델). 닫혀 있으면 열고 유지, 열려 있으면 클릭 지점을
+            // 커밋: leaf는 실행 후 메뉴 유지(연속 토글), 중앙 dead zone(✕)/바깥 클릭만 닫는다. 앱으론 후킹이 흡수.
             if (button == MouseButton.Middle)
             {
                 if (_drawing.IsDrawingModeActive) return;
                 if (_runtime.IsRadialMenuActive && _radialByMiddle)
                 {
-                    _radial.Update(point, now); // 클릭 지점 선택 확정
-                    _radial.Close();            // 실행(가운데 dead zone이면 취소) 후 닫기
-                    _radialByMiddle = false;
-                    _midOpenedThisPress = false;
+                    _radial.Update(point, now); // 클릭 지점으로 선택 확정
+                    if (!_radial.Commit())      // leaf 실행+유지 / 중앙·바깥이면 false → 닫기
+                    {
+                        _radial.Close();
+                        _radialByMiddle = false;
+                    }
                 }
                 else if (!_runtime.IsRadialMenuActive)
                 {
                     _radial.Open(point, now);   // 열고 유지
                     _runtime.IsRadialMenuVisible = true;
                     _radialByMiddle = true;
-                    _midOpenedThisPress = true;
-                    _midDownPos = point;
                 }
                 return;
             }
@@ -447,23 +445,8 @@ public sealed class OverlayCoordinator : IDisposable
         double now = _clock.NowSeconds;
         lock (_gate)
         {
-            // 가운데 버튼 뗌 — 이 누름이 메뉴를 열었고 커서가 눌린 지점에서 벗어났으면(눌러 끌어 떼기)
-            // 그 자리 선택 실행+닫기(마킹). 제자리 탭이면 유지(클릭 토글 모드).
-            if (button == MouseButton.Middle)
-            {
-                if (_runtime.IsRadialMenuActive && _radialByMiddle && _midOpenedThisPress)
-                {
-                    double mdx = point.X - _midDownPos.X, mdy = point.Y - _midDownPos.Y;
-                    if (mdx * mdx + mdy * mdy > MiddleMoveDeadband * MiddleMoveDeadband)
-                    {
-                        _radial.Update(point, now);
-                        _radial.Close();
-                        _radialByMiddle = false;
-                    }
-                }
-                _midOpenedThisPress = false;
-                return;
-            }
+            // 가운데 버튼 뗌 — 클릭 토글 모델이라 down에서 모두 처리, up은 무시(후킹만 흡수).
+            if (button == MouseButton.Middle) return;
 
             if (_runtime.IsRadialMenuActive) return;
             if (button != MouseButton.Left) return;
