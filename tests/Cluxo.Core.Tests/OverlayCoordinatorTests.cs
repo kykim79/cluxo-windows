@@ -502,7 +502,7 @@ public class OverlayCoordinatorTests
         h.Radial.Open();
         Assert.True(h.Coordinator.IsRadialMenuActive);
 
-        h.Cursor.Position = new PointD(0, 80); h.Clock.NowSeconds = 0.2; // 12시 메인 → sector 0
+        h.Cursor.Position = new PointD(0, -80); h.Clock.NowSeconds = 0.2; // 화면-위(12시) 메인 → sector 0
         h.Coordinator.RenderFrame();
         var radial = h.Factory.Created["A"].Last!.Value.Radial;
         Assert.NotNull(radial);
@@ -517,7 +517,7 @@ public class OverlayCoordinatorTests
         h.Coordinator.Start();
         h.Cursor.Position = new PointD(0, 0);
         h.Radial.Open();
-        h.Cursor.Position = new PointD(0, 80); h.Clock.NowSeconds = 0.2;
+        h.Cursor.Position = new PointD(0, -80); h.Clock.NowSeconds = 0.2;
         h.Coordinator.RenderFrame();        // sector 0 (Spotlight) 메인 선택
         h.Radial.Close();                   // 실행 → 스포트라이트 토글
         Assert.True(h.Coordinator.IsSpotlightActive);

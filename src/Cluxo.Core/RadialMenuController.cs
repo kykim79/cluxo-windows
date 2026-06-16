@@ -44,7 +44,9 @@ public sealed class RadialMenuController
         if (now - _openTime >= RevealThreshold) _runtime.IsRadialMenuVisible = true;
 
         double dx = cursorPos.X - _runtime.RadialMenuCenter.X;
-        double dy = cursorPos.Y - _runtime.RadialMenuCenter.Y;
+        // Windows 화면 좌표는 y가 아래로 증가하지만, 라디얼 fan 수학(RadialHitTest.ClockwiseFromTop)은
+        // y-up(12시=+y) 기준이다. 화면-위로 움직이면 sector 0(12시)이 선택되도록 dy를 뒤집는다.
+        double dy = _runtime.RadialMenuCenter.Y - cursorPos.Y;
         var hit = Classify(dx, dy);
         _runtime.RadialMenuSelectedSector = hit.Sector;
         _runtime.RadialMenuSelectedSubItem = hit.Sub;

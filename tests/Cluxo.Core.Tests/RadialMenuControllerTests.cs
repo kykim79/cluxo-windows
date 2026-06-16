@@ -42,7 +42,7 @@ public class RadialMenuControllerTests
     {
         var (c, _, r) = Make();
         c.Open(new PointD(0, 0), now: 0);
-        c.Update(new PointD(0, 80), now: 0.2); // 12시 메인 영역 → sector 0 (Spotlight)
+        c.Update(new PointD(0, -80), now: 0.2); // 화면-위(12시) 메인 영역 → sector 0 (Spotlight)
         Assert.Equal(0, r.RadialMenuSelectedSector);
     }
 

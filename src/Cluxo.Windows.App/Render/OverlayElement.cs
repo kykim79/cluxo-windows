@@ -199,20 +199,44 @@ internal sealed class OverlayElement : FrameworkElement
     {
         if (f.Radial is not { } radial || !radial.Visible) return;
         var center = ToLocal(radial.Center);
+        double dead = Tokens.Radial.DeadRadius, main = Tokens.Radial.MainOuter;
 
-        // dead/main 가이드 원
-        dc.DrawEllipse(null, StrokePen(Rgba.FromWhite(0.25), 1.5, 1.0), center, Tokens.Radial.DeadRadius, Tokens.Radial.DeadRadius);
-        dc.DrawEllipse(null, StrokePen(Rgba.FromWhite(0.18), 1.0, 1.0), center, Tokens.Radial.MainOuter, Tokens.Radial.MainOuter);
+        // 배경 veil + 가이드 원 (라벨 가독성)
+        dc.DrawEllipse(MakeBrush(Tokens.Surface.Veil, 1.0), StrokePen(Rgba.FromWhite(0.22), 1.5, 1.0), center, main, main);
+        dc.DrawEllipse(null, StrokePen(Rgba.FromWhite(0.25), 1.5, 1.0), center, dead, dead);
 
-        // 선택된 sector wedge 강조 (선택 로직과 일치하게 그림 — cw=i*45 ↔ 화면각 90-cw)
-        // NOTE: 라디얼 좌표는 y-up(맥) 기준 — 자연스러운 "위=sector0" UX는 코디네이터 dy 반전 후속(TODO).
-        if (radial.Sector is { } sector)
+        // 선택 sector wedge 강조. 코디네이터 dy 반전 후 sector i 화면각 β = i*45-90(12시=sector0, 시계방향).
+        if (radial.Sector is { } sel)
         {
-            double aLow = 67.5 - sector * 45.0;   // cw = sector*45+22.5
-            double aHigh = 112.5 - sector * 45.0; // cw = sector*45-22.5
-            var wedge = PieWedge(center, Tokens.Radial.DeadRadius, Tokens.Radial.MainOuter, aLow, aHigh);
-            dc.DrawGeometry(MakeBrush(accent, 0.30), StrokePen(accent, 2, 0.9), wedge);
+            double aLow = sel * 45.0 - 112.5, aHigh = sel * 45.0 - 67.5; // β ± 22.5
+            dc.DrawGeometry(MakeBrush(accent, 0.30), StrokePen(accent, 2, 0.9),
+                PieWedge(center, dead, main, aLow, aHigh));
         }
+
+        // 8개 메인 sector 라벨 (RadialMenu 트리). sub/subSub fan 라벨은 후속.
+        double labelR = (dead + main) / 2;
+        for (int i = 0; i < 8; i++)
+        {
+            double beta = (i * 45.0 - 90.0) * Math.PI / 180.0;
+            var pos = new Point(center.X + labelR * Math.Cos(beta), center.Y + labelR * Math.Sin(beta));
+            bool selected = radial.Sector == i;
+            DrawCenteredText(dc, ((RadialMenuItem)i).Label(), pos, (double)Tokens.Text.CaptionSmall.Size,
+                selected ? Rgba.FromWhite(0.98) : Rgba.FromWhite(0.55), bold: selected);
+        }
+
+        // 중앙: 선택 sector 라벨(없으면 힌트)
+        string centerText = radial.Sector is { } cs ? ((RadialMenuItem)cs).Label() : "···";
+        DrawCenteredText(dc, centerText, center, (double)Tokens.Text.Label.Size, accent, bold: true);
+    }
+
+    private void DrawCenteredText(DrawingContext dc, string text, Point center, double size, Rgba color, bool bold)
+    {
+        double ppd = _monitor.DpiScale <= 0 ? 1.0 : _monitor.DpiScale;
+        var tf = new Typeface(new FontFamily("Segoe UI"), FontStyles.Normal,
+            bold ? FontWeights.SemiBold : FontWeights.Normal, FontStretches.Normal);
+        var ft = new FormattedText(text, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, tf,
+            size, MakeBrush(color, 1.0), ppd);
+        dc.DrawText(ft, new Point(center.X - ft.Width / 2, center.Y - ft.Height / 2));
     }
 
     private static Geometry PieWedge(Point c, double r0, double r1, double aLowDeg, double aHighDeg)
