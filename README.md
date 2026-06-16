@@ -31,12 +31,12 @@ dotnet test       # Cluxo.Core 단위 테스트
 | DrawingState | ✅ 이식·테스트(48) | 7개 도구·모디파이어 매핑(Cmd→Ctrl/Opt→Alt)·두께 단계·undo·툴바 hit-test. onboarding은 UI 계층 |
 | JsonSettingsStore (Persisted) | ✅ 이식·테스트(7) | %APPDATA% JSON 영구화. 기본값/손상 fallback·라운드트립. 파일IO·디바운스는 플랫폼 계층 |
 | BrandingConfig | ✅ 이식·테스트(11) | 코브랜딩 런타임 주입 + HMAC 무결성(변조/미서명 → 순정 fallback). 외부보이스 P1(T3) |
-
 | Tokens (DESIGN.md 전체) | ✅ 이식·테스트(19) | Surface/Stroke/Motion/Radial/Radius/Spacing/Drawing/Text 전체. SwiftUI 타입→플랫폼 무관 데이터 |
+| EffectsState | ✅ 이식·테스트(15) | 클릭/스크롤/흔들기/정지펄스/트레일 큐. Task.sleep→시간주입 Prune(now)로 대체(결정적). 트랙패드/클립보드 제외 |
 
 추가 Core 타입: `PointD`/`RectD`/`Rgba`(+opacity 팩토리·needsDarkText), `Spring`/`Ease`/`FontToken`(Visuals), `KeyModifiers`/`SpecialKey`.
 
-**Cluxo.Core v1 순수 로직 + 디자인 토큰 이식 완료 — 162 tests green.** (GestureClassifier는 설계대로 제외: Windows에 raw 터치 입력원 없음.)
+**Cluxo.Core v1 순수 로직 + 디자인 토큰 이식 완료 — 186 tests green.** (GestureClassifier는 설계대로 제외: Windows에 raw 터치 입력원 없음.)
 
 ## 네이티브 계층 경계 (`Cluxo.Core.Platform`)
 
@@ -67,7 +67,7 @@ Core 상태 + 플랫폼 인터페이스를 배선하는 중앙 조정자 (Mac `A
 - 배선: ⌃⌥D 토글, 좌클릭 그리기 start/end, ESC clear, `[ ]` 두께+영구화, Ctrl+Z undo, 모니터 변경 시 렌더러 재구성, 후킹 분실(T2) → `MouseHookLost`, 종료 시 설정 flush.
 - TODO(상태 이식 시 연결): 클릭/스크롤/트레일 효과, 링 외형(CursorSettings), 키스트로크 오버레이, 발표앱 감지 동작.
 
-**현재 171 tests green.** 다음 단계는 플랫폼 인터페이스의 **네이티브 구현**(Input/Render/Shell)으로, Windows 실행 환경(Parallels VM/미니PC)이 필요.
+**현재 186 tests green.** 다음 단계는 플랫폼 인터페이스의 **네이티브 구현**(Input/Render/Shell)으로, Windows 실행 환경(Parallels VM/미니PC)이 필요.
 
 ## 선행 게이트 (코드 본투자 전)
 
