@@ -20,7 +20,7 @@ internal sealed class SettingsWindow : Window
     {
         Title = "Cluxo 설정";
         Width = 440;
-        Height = 520;
+        Height = 620;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
         ResizeMode = ResizeMode.CanMinimize;
         ShowInTaskbar = true;
@@ -41,6 +41,14 @@ internal sealed class SettingsWindow : Window
         panel.Children.Add(EnumRow("모양", s.RingShape, v => s.RingShape = v, v => v.Label()));
         panel.Children.Add(EnumRow("크기", s.RingSize, v => s.RingSize = v, v => v.Label()));
         panel.Children.Add(SliderRow("투명도", s.RingOpacity, 0.2, 1.0, 0.05, v => s.RingOpacity = v, v => $"{(int)Math.Round(v * 100)}%"));
+
+        panel.Children.Add(Header("효과"));
+        panel.Children.Add(CheckRow("트레일", s.IsTrailEnabled, v => s.IsTrailEnabled = v));
+        panel.Children.Add(CheckRow("코멧 꼬리", s.IsCometTailEnabled, v => s.IsCometTailEnabled = v));
+        panel.Children.Add(CheckRow("흔들기로 찾기", s.IsShakeEnabled, v => s.IsShakeEnabled = v));
+        panel.Children.Add(CheckRow("스크롤 표시", s.IsScrollIndicatorEnabled, v => s.IsScrollIndicatorEnabled = v));
+        panel.Children.Add(CheckRow("드래그 기준선", s.IsAnchoredLineEnabled, v => s.IsAnchoredLineEnabled = v));
+        panel.Children.Add(CheckRow("키 입력 표시", s.IsKeystrokeEnabled, v => s.IsKeystrokeEnabled = v));
 
         panel.Children.Add(Header("동작"));
         panel.Children.Add(EnumRow("애니메이션 속도", s.AnimationSpeed, v => s.AnimationSpeed = v, v => v.Label()));

@@ -62,6 +62,14 @@ public sealed class OverlayCoordinator : IDisposable
     private double _animationSpeed = 1.0;
     private double _keystrokeTimeout = 3.0;
 
+    // 효과 토글 캐시 — 설정창/라디얼에서 켜고 끔. (시각 효과가 있는 것만 게이트)
+    private bool _trailEnabled;
+    private bool _cometTailEnabled;
+    private bool _shakeEnabled = true;
+    private bool _scrollEnabled = true;
+    private bool _keystrokeEnabled;
+    private bool _anchoredLineEnabled;
+
     private const string LineWidthKey = "drawing.lineWidth";
     private const double DoubleClickWindow = 0.4;
     private const double DoubleClickRadius = 6;
@@ -161,12 +169,12 @@ public sealed class OverlayCoordinator : IDisposable
                 }
                 else
                 {
-                    // 일시적 효과는 그리기 모드에선 억제(오버레이가 annotation 전용)
-                    if (shook) _effects.AddShake(pos, now, _animationSpeed);
-                    _effects.UpdateTrail(pos);
+                    // 일시적 효과는 그리기 모드에선 억제(오버레이가 annotation 전용). 각 효과는 설정 토글로 게이트.
+                    if (shook && _shakeEnabled) _effects.AddShake(pos, now, _animationSpeed);
+                    if (_trailEnabled) _effects.UpdateTrail(pos);
                     if (_leftDown)
                     {
-                        _effects.UpdateDragTrail(pos); // 비-그리기 드래그(창 이동 등) streak
+                        if (_cometTailEnabled) _effects.UpdateDragTrail(pos); // 비-그리기 드래그 streak(코멧)
                         // 드래그 모션 — 프레임 샘플 위치 델타로 속도/각도(하이브리드 입력)
                         double dt = now - _lastDragTime;
                         if (dt > 0.0001)
@@ -178,7 +186,7 @@ public sealed class OverlayCoordinator : IDisposable
                             _lastDragPos = pos;
                             _lastDragTime = now;
                         }
-                        _runtime.CheckAnchoredLine(pos, now); // #17 거리/시간 임계
+                        if (_anchoredLineEnabled) _runtime.CheckAnchoredLine(pos, now); // #17 거리/시간 임계
                     }
                 }
             }
@@ -265,6 +273,13 @@ public sealed class OverlayCoordinator : IDisposable
             _animationSpeed = _settingsModel.AnimationSpeed.Multiplier();
             _keystrokeTimeout = _settingsModel.KeystrokeTimeout;
             _shake.RequiredDirChanges = _settingsModel.ShakeSensitivity.RequiredDirChanges();
+
+            _trailEnabled = _settingsModel.IsTrailEnabled;
+            _cometTailEnabled = _settingsModel.IsCometTailEnabled;
+            _shakeEnabled = _settingsModel.IsShakeEnabled;
+            _scrollEnabled = _settingsModel.IsScrollIndicatorEnabled;
+            _keystrokeEnabled = _settingsModel.IsKeystrokeEnabled;
+            _anchoredLineEnabled = _settingsModel.IsAnchoredLineEnabled;
         }
     }
 
@@ -384,6 +399,7 @@ public sealed class OverlayCoordinator : IDisposable
         lock (_gate)
         {
             if (_runtime.IsRadialMenuActive || _drawing.IsDrawingModeActive) return; // 효과 억제
+            if (!_scrollEnabled) return; // 스크롤 표시 설정 OFF
             bool isVertical = Math.Abs(delta.Y) >= Math.Abs(delta.X);
             double magnitude = isVertical ? Math.Abs(delta.Y) : Math.Abs(delta.X);
             bool isPositive = isVertical ? delta.Y > 0 : delta.X > 0;
@@ -412,10 +428,13 @@ public sealed class OverlayCoordinator : IDisposable
                     _drawing.UndoLastShape();
             }
 
-            // 키스트로크 오버레이 — Format이 게이트(Ctrl/Alt/Win 필수)라 단순 타이핑은 "" 반환(표시 X)
-            string display = KeyFormat.Format(e.Modifiers, e.Special, e.Characters);
-            if (!string.IsNullOrEmpty(display))
-                _keystrokes.ShowKeystroke(display, _keystrokeTimeout, now);
+            // 키스트로크 오버레이 — 설정 ON일 때만. Format이 게이트(Ctrl/Alt/Win 필수)라 단순 타이핑은 "" 반환.
+            if (_keystrokeEnabled)
+            {
+                string display = KeyFormat.Format(e.Modifiers, e.Special, e.Characters);
+                if (!string.IsNullOrEmpty(display))
+                    _keystrokes.ShowKeystroke(display, _keystrokeTimeout, now);
+            }
         }
     }
 

@@ -100,12 +100,12 @@ internal static class SelfTest
     {
         var settings = new CursorSettings(new JsonSettingsStore());
         var panel = Ui.SettingsWindow.BuildPanel(settings, new StubLaunch());
-        var border = new Border { Width = 440, Height = 560, Background = Brushes.White, Child = panel };
-        border.Measure(new Size(440, 560));
-        border.Arrange(new Rect(0, 0, 440, 560));
+        var border = new Border { Width = 440, Height = 720, Background = Brushes.White, Child = panel };
+        border.Measure(new Size(440, 720));
+        border.Arrange(new Rect(0, 0, 440, 720));
         border.UpdateLayout();
 
-        var rtb = new RenderTargetBitmap(440, 560, 96, 96, PixelFormats.Pbgra32);
+        var rtb = new RenderTargetBitmap(440, 720, 96, 96, PixelFormats.Pbgra32);
         rtb.Render(border);
 
         string png = Path.Combine(Path.GetTempPath(), "cluxo-selftest-settings.png");

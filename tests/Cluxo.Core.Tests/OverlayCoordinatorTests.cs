@@ -383,12 +383,78 @@ public class OverlayCoordinatorTests
         Assert.NotEmpty(h.Factory.Created["A"].Last!.Value.Effects.Shakes);
     }
 
+    // ── 효과 토글 게이팅 ────────────────────────────────────────
+
+    [Fact]
+    public void Trail_Enabled_ProducesTrail()
+    {
+        var h = new Harness();
+        h.Settings.Store.Set("isTrailEnabled", true);
+        h.Coordinator.Start();
+        foreach (var x in new[] { 100, 110, 120 })
+        {
+            h.Cursor.Position = new PointD(x, 100);
+            h.Coordinator.RenderFrame();
+        }
+        Assert.NotEmpty(h.Factory.Created["A"].Last!.Value.Effects.Trail);
+    }
+
+    [Fact]
+    public void Trail_OffByDefault_NoTrail()
+    {
+        var h = new Harness();
+        h.Coordinator.Start(); // isTrailEnabled 기본 false
+        foreach (var x in new[] { 100, 110, 120 })
+        {
+            h.Cursor.Position = new PointD(x, 100);
+            h.Coordinator.RenderFrame();
+        }
+        Assert.Empty(h.Factory.Created["A"].Last!.Value.Effects.Trail);
+    }
+
+    [Fact]
+    public void Scroll_Disabled_NoEffect()
+    {
+        var h = new Harness();
+        h.Settings.Store.Set("scrollIndicator", false);
+        h.Coordinator.Start();
+        h.Mouse.Scroll(new ScrollDelta(0, 5), new PointD(100, 100));
+        h.Coordinator.RenderFrame();
+        Assert.Empty(h.Factory.Created["A"].Last!.Value.Effects.Scrolls);
+    }
+
+    [Fact]
+    public void Shake_Disabled_NoEffect()
+    {
+        var h = new Harness();
+        h.Settings.Store.Set("isShakeEnabled", false);
+        h.Coordinator.Start();
+        foreach (var x in new double[] { 0, 100, 0, 100, 0, 100, 0 })
+        {
+            h.Cursor.Position = new PointD(x, 0);
+            h.Coordinator.RenderFrame();
+            h.Clock.NowSeconds += 0.05;
+        }
+        Assert.Empty(h.Factory.Created["A"].Last!.Value.Effects.Shakes);
+    }
+
+    [Fact]
+    public void Keystroke_OffByDefault_NotShown()
+    {
+        var h = new Harness();
+        h.Coordinator.Start(); // isKeystrokeEnabled 기본 false
+        h.Keyboard.Press(new KeyEvent(KeyModifiers.Control, null, "c"));
+        h.Coordinator.RenderFrame();
+        Assert.Null(h.Coordinator.Keystroke);
+    }
+
     // ── 키스트로크 오버레이 배선 ─────────────────────────────────
 
     [Fact]
     public void KeyPressed_WithModifier_ShowsKeystroke()
     {
         var h = new Harness();
+        h.Settings.Store.Set("isKeystrokeEnabled", true); // 기본 OFF — 설정 ON
         h.Coordinator.Start();
         h.Keyboard.Press(new KeyEvent(KeyModifiers.Control, null, "c"));
         h.Coordinator.RenderFrame();
@@ -466,6 +532,7 @@ public class OverlayCoordinatorTests
     public void KeystrokeTimeout_ComesFromSettings_Default3s()
     {
         var h = new Harness();
+        h.Settings.Store.Set("isKeystrokeEnabled", true); // 기본 OFF — 설정 ON
         h.Coordinator.Start();
         h.Clock.NowSeconds = 0;
         h.Keyboard.Press(new KeyEvent(KeyModifiers.Control, null, "c"));
@@ -541,6 +608,7 @@ public class OverlayCoordinatorTests
     public void NonDrawingDrag_TracksVelocityAndAnchoredLine()
     {
         var h = new Harness();
+        h.Settings.Store.Set("isAnchoredLineEnabled", true); // 기본 OFF — 설정 ON
         h.Coordinator.Start();
         h.Clock.NowSeconds = 0;
         h.Mouse.Down(MouseButton.Left, new PointD(0, 0)); // StartDrag
