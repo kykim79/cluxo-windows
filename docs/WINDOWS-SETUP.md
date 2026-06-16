@@ -164,7 +164,9 @@ dotnet build Cluxo.Windows.sln
 
 **진입점**: `Program.cs`에서 위 구현들을 `new OverlayCoordinator(...)`에 주입 → `Start()` → 렌더 루프(타이머/DComp commit)에서 `RenderFrame()` 호출.
 
-가장 어려운 순서: **오버레이 렌더(레이어드+DComp+Direct2D)** > 입력 후킹 > 트레이/설정. 오버레이부터 "빈 투명 윈도우에 링 하나 그리기"로 시작해 `OverlayFrame`을 점진 소비하는 게 좋다.
+가장 어려운 순서: **오버레이 렌더(DComp+Direct2D)** > 입력 후킹 > 트레이/설정. 오버레이부터 "빈 투명 윈도우에 링 하나 그리기"로 시작해 `OverlayFrame`을 점진 소비하는 게 좋다.
+
+> 오버레이 렌더 상세 설계(컴포지션 스택·DPI 변환·그리기 모드 입력 토글·구현 순서): **[OVERLAY-RENDER.md](OVERLAY-RENDER.md)**
 
 ---
 
