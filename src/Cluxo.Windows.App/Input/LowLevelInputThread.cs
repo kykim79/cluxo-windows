@@ -59,6 +59,9 @@ internal sealed class LowLevelInputThread : IDisposable
     public event Action? RadialOpened;
     public event Action? RadialClosed;
 
+    /// <summary>진단용 — 모든 키 전이(vk, down, 반영후 모디파이어). 평소 구독자 없음.</summary>
+    public event Action<uint, bool, KeyModifiers>? RawKeyDiag;
+
     /// <summary>마우스 후킹 재설치됨(T2) — 코디네이터가 트레이로 알림.</summary>
     public event Action? HookRemoved;
 
@@ -215,6 +218,7 @@ internal sealed class LowLevelInputThread : IDisposable
             case RawKind.Key:
                 _modifiers.OnKey(ev.Vk, ev.KeyDown);
                 var mods = _modifiers.Current;
+                RawKeyDiag?.Invoke(ev.Vk, ev.KeyDown, mods);
 
                 // 라디얼 chord(⌃⌥,) 전이는 down/up 모두로 판정
                 switch (_radial.OnKey(ev.Vk, ev.KeyDown, mods))

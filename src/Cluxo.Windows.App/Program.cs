@@ -77,6 +77,18 @@ internal static class Program
             input.Mouse, input.Keyboard, input.Hotkeys, input.CursorSource, shell.Monitors,
             overlay.Factory, shell.Settings, shell.Branding, shell.Foreground, input.RadialTrigger, shell.Clock);
 
+        // 진단(--diag): 키 VK·모디파이어, 라디얼 chord 발화, 후킹 분실을 %TEMP%\cluxo-diag.log에 기록.
+        if (args.Contains("--diag"))
+        {
+            var logPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "cluxo-diag.log");
+            System.IO.File.WriteAllText(logPath, $"diag start {DateTime.Now:HH:mm:ss}\n");
+            void Log(string s) { try { System.IO.File.AppendAllText(logPath, $"{DateTime.Now:HH:mm:ss.fff} {s}\n"); } catch { } }
+            input.EnableKeyDiag((vk, down, mods) => Log($"KEY vk=0x{vk:X2} {(down ? "DN" : "up")} mods={mods}"));
+            input.RadialTrigger.Opened += () => Log("=== RADIAL OPENED ===");
+            input.RadialTrigger.Closed += () => Log("=== RADIAL CLOSED ===");
+            coordinator.MouseHookLost += () => Log("HOOK REMOVED (reinstalled)");
+        }
+
         using var exit = new ManualResetEventSlim(false);
 
         // T2: 마우스 후킹 분실 → 재설치됨을 트레이 풍선으로 알림.

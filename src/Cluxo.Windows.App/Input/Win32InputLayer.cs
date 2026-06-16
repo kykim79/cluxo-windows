@@ -37,6 +37,9 @@ public sealed class Win32InputLayer : IDisposable
     /// <summary>후킹 재설치 요청(T2) — 세션/데스크톱 전환 후 Shell 계층이 호출.</summary>
     public void RequestReinstall() => _thread.RequestReinstall();
 
+    /// <summary>진단용 — 모든 키 전이(vk, down, 모디파이어)를 sink로 흘린다(--diag).</summary>
+    public void EnableKeyDiag(Action<uint, bool, Cluxo.Core.KeyModifiers> sink) => _thread.RawKeyDiag += sink;
+
     public void Dispose()
     {
         if (_disposed) return;
