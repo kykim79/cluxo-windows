@@ -44,6 +44,12 @@ internal static class Program
             Environment.Exit(SelfTest.RunRings());
             return;
         }
+        if (args.Length > 0 && args[0] == "--make-icon")
+        {
+            Ui.IconMaker.Make(args.Length > 1 ? args[1] : System.IO.Path.Combine(System.IO.Path.GetTempPath(), "cluxo.ico"));
+            Environment.Exit(0);
+            return;
+        }
 
         // 입력·Shell·렌더 계층은 서로 독립(각자 전용 스레드) → 병렬 생성으로 스레드 기동·WPF init을 겹친다.
         // overlay의 clock 람다는 렌더 시점에만 호출되므로 shell이 그때 준비돼 있으면 된다.

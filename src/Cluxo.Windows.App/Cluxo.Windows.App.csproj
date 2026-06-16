@@ -16,13 +16,30 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <UseWPF>true</UseWPF>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\cluxo.ico</ApplicationIcon>
     <StartupObject>Cluxo.Windows.App.Program</StartupObject>
     <!-- 퍼블리시 시 ReadyToRun(AOT 사전컴파일)로 cold-start JIT 절감(~150-200ms). build/test엔 무영향. -->
     <PublishReadyToRun>true</PublishReadyToRun>
+
+    <!-- 패키징 메타데이터 -->
+    <Product>Cluxo for Windows</Product>
+    <AssemblyTitle>Cluxo</AssemblyTitle>
+    <Company>Cluxo</Company>
+    <Authors>kykim79</Authors>
+    <Description>커서 강조 발표 도구 (macOS Cluxo의 네이티브 Windows 재구현)</Description>
+    <Version>1.0.0</Version>
+    <Copyright>Copyright © 2026</Copyright>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Cluxo.Core\Cluxo.Core.csproj" />
+  </ItemGroup>
+
+  <!-- 트레이가 런타임에 LoadImage로 읽을 아이콘 — 출력에 복사 -->
+  <ItemGroup>
+    <Content Include="Assets\cluxo.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
   <!-- 입력 계층 순수 로직(internal)을 단위 테스트에 노출 -->

@@ -2,6 +2,10 @@
 bin/
 obj/
 
+# Publish output (배포 산출물 — 커밋 안 함)
+publish/
+publish-r2r/
+
 # Rider / VS / VS Code
 .idea/
 .vs/

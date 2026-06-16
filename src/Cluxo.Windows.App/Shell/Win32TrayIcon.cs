@@ -18,6 +18,7 @@ internal sealed class Win32TrayIcon : ITrayIcon
     private volatile IReadOnlyList<TrayMenuItem> _items = Array.Empty<TrayMenuItem>();
     private bool _added;
     private bool _disposed;
+    private IntPtr _icon; // 파일에서 로드한 아이콘(소유 → DestroyIcon)
 
     public event Action<string>? ItemClicked;
 
@@ -41,12 +42,28 @@ internal sealed class Win32TrayIcon : ITrayIcon
             uID = TrayId,
             uFlags = SN.NIF_MESSAGE | SN.NIF_ICON | SN.NIF_TIP,
             uCallbackMessage = SN.WM_TRAYCALLBACK,
-            hIcon = SN.LoadIcon(IntPtr.Zero, SN.IDI_APPLICATION), // 코브랜딩 시 회사 .ico로 교체
+            hIcon = LoadTrayIcon(), // Assets\cluxo.ico (없으면 시스템 기본)
             szTip = _tooltip,
             szInfo = "",
             szInfoTitle = "",
         };
         _added = SN.Shell_NotifyIcon(SN.NIM_ADD, ref nid);
+    }
+
+    // 앱 아이콘을 파일에서 로드(코브랜딩 시 회사 .ico로 교체 가능). 실패 시 시스템 기본.
+    private IntPtr LoadTrayIcon()
+    {
+        try
+        {
+            var path = System.IO.Path.Combine(AppContext.BaseDirectory, "Assets", "cluxo.ico");
+            if (System.IO.File.Exists(path))
+            {
+                _icon = SN.LoadImage(IntPtr.Zero, path, SN.IMAGE_ICON, 0, 0, SN.LR_LOADFROMFILE | SN.LR_DEFAULTSIZE);
+                if (_icon != IntPtr.Zero) return _icon;
+            }
+        }
+        catch { /* 폴백 */ }
+        return SN.LoadIcon(IntPtr.Zero, SN.IDI_APPLICATION);
     }
 
     public void SetMenu(IReadOnlyList<TrayMenuItem> items) => _items = items;
@@ -129,5 +146,6 @@ internal sealed class Win32TrayIcon : ITrayIcon
                 SN.Shell_NotifyIcon(SN.NIM_DELETE, ref nid);
             });
         }
+        if (_icon != IntPtr.Zero) { SN.DestroyIcon(_icon); _icon = IntPtr.Zero; }
     }
 }
