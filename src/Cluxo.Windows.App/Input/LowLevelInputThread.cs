@@ -263,8 +263,8 @@ internal sealed class LowLevelInputThread : IDisposable
         _watchdog?.Dispose();
         _queue.CompleteAdding();                                   // 디스패치 루프 종료
         PostThreadMessage(_pumpThreadId, WM_QUIT, UIntPtr.Zero, IntPtr.Zero); // 펌프 루프 종료
-        _pumpThread?.Join(1000);
-        _dispatchThread?.Join(1000);
+        _pumpThread?.Join(500);   // 정상은 ~0ms; 상한은 멈춤 방어용
+        _dispatchThread?.Join(500);
         _pumpReady.Dispose();
         _queue.Dispose();
     }

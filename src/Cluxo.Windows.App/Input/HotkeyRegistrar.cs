@@ -103,7 +103,7 @@ internal sealed class HotkeyRegistrar : IHotkeyRegistrar
         if (_disposed) return;
         _disposed = true;
         PostThreadMessage(_threadId, WM_QUIT, UIntPtr.Zero, IntPtr.Zero);
-        _thread.Join(1000);
+        _thread.Join(500); // 정상은 ~0ms
         _ready.Dispose();
     }
 

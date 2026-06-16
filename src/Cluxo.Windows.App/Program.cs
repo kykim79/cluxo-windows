@@ -35,9 +35,9 @@ internal static class Program
             return;
         }
 
-        using var input = new Win32InputLayer();
-        using var shell = new Win32ShellLayer("Cluxo");
-        using var overlay = new WpfOverlayHost(() => shell.Clock.NowSeconds);
+        var input = new Win32InputLayer();
+        var shell = new Win32ShellLayer("Cluxo");
+        var overlay = new WpfOverlayHost(() => shell.Clock.NowSeconds);
 
         var coordinator = new OverlayCoordinator(
             input.Mouse, input.Keyboard, input.Hotkeys, input.CursorSource, shell.Monitors,
@@ -79,10 +79,13 @@ internal static class Program
 
         exit.Wait(); // 트레이 '종료'(또는 자동 종료)까지 블록
 
-        // 종료 순서: 렌더 루프 정지 → 코디네이터 → 렌더 호스트 (UI 스레드가 _gate 다투지 않게)
+        // 명시적 순서 종료(using 역순 의존보다 명확): 렌더 루프 정지 → 코디네이터 → 렌더 호스트 → Shell → 입력.
+        // 렌더 루프를 먼저 멈춰야 UI 스레드가 coordinator._gate를 다투지 않는다. 정상 종료는 ~수십 ms.
         overlay.StopRenderLoop();
         coordinator.Dispose();
-        // using: autoExit → overlay → shell → input 순으로 Dispose
+        overlay.Dispose();
+        shell.Dispose();
+        input.Dispose();
     }
 
     private static IDisposable? ScheduleAutoExit(string[] args, ManualResetEventSlim exit)

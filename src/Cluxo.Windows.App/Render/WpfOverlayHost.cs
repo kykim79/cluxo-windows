@@ -85,7 +85,7 @@ public sealed class WpfOverlayHost : IDisposable
         if (_disposed) return;
         _disposed = true;
         _dispatcher.Invoke(() => { _timer?.Stop(); _app?.Shutdown(); });
-        _thread.Join(2000);
+        _thread.Join(1000); // WPF Application.Run 종료 — 정상은 ~수ms
         _ready.Dispose();
     }
 }
