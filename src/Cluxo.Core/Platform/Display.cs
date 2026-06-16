@@ -15,8 +15,13 @@ public interface IMonitorProvider
     event Action? MonitorsChanged;
 }
 
-/// <summary>커서 강조 링의 한 프레임 시각 상태. (Ring 뷰 이식 시 필드 확장)</summary>
-public readonly record struct RingVisual(Rgba Color, double Radius, double Scale, double Opacity);
+/// <summary>
+/// 커서 강조 링의 한 프레임 시각 상태. Shape/BorderWidth/Dashed는 설정(RingShape·BorderWeight·
+/// BorderStyle)에서 온다. 새 필드는 기본값이 있어 기존 생성 호출과 호환.
+/// </summary>
+public readonly record struct RingVisual(
+    Rgba Color, double Radius, double Scale, double Opacity,
+    RingShape Shape = RingShape.Circle, double BorderWidth = 3.0, bool Dashed = false);
 
 /// <summary>드래그 중 시각 힌트 — anchored line(#17)·speed glow(#14, Velocity)·드래그 각도 라벨용.</summary>
 public readonly record struct DragVisual(

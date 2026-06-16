@@ -151,12 +151,61 @@ internal sealed class OverlayElement : FrameworkElement
         }
     }
 
-    // ── 커서 링 ─────────────────────────────────────────────────
+    // ── 커서 링 (모양·두께·선 스타일) ──────────────────────────
     private void DrawRing(DrawingContext dc, OverlayFrame f)
     {
         if (f.Ring is not { } ring || f.CursorPosition is not { } cursor) return;
         double r = ring.Radius * ring.Scale;
-        dc.DrawEllipse(null, StrokePen(ring.Color, 3, ring.Opacity), ToLocal(cursor), r, r);
+        var c = ToLocal(cursor);
+        var pen = RingPen(ring.Color, ring.BorderWidth, ring.Opacity, ring.Dashed);
+
+        switch (ring.Shape)
+        {
+            case RingShape.Squircle:
+                double cr = r * 0.45; // 둥근 모서리
+                dc.DrawRoundedRectangle(null, pen, new Rect(c.X - r, c.Y - r, r * 2, r * 2), cr, cr);
+                break;
+            case RingShape.Rhombus:
+                dc.DrawGeometry(null, pen, Polygon(c, r, 4)); // 4각(꼭짓점 위) = 마름모
+                break;
+            case RingShape.Hexagon:
+                dc.DrawGeometry(null, pen, Polygon(c, r, 6));
+                break;
+            default: // Circle
+                dc.DrawEllipse(null, pen, c, r, r);
+                break;
+        }
+    }
+
+    private Pen RingPen(Rgba color, double width, double opacity, bool dashed)
+    {
+        var pen = new Pen(MakeBrush(color, opacity), width)
+        {
+            StartLineCap = PenLineCap.Round,
+            EndLineCap = PenLineCap.Round,
+            LineJoin = PenLineJoin.Round,
+        };
+        if (dashed) pen.DashStyle = new DashStyle(new double[] { 4, 3 }, 0); // 폭 단위 대시
+        pen.Freeze();
+        return pen;
+    }
+
+    // 중심 기준 정n각형 외곽(첫 꼭짓점 위, 12시). 화면 좌표.
+    private static Geometry Polygon(Point center, double r, int n)
+    {
+        Point P(int i)
+        {
+            double a = (-90.0 + i * 360.0 / n) * Math.PI / 180.0;
+            return new Point(center.X + r * Math.Cos(a), center.Y + r * Math.Sin(a));
+        }
+        var geo = new StreamGeometry();
+        using (var ctx = geo.Open())
+        {
+            ctx.BeginFigure(P(0), isFilled: false, isClosed: true);
+            for (int i = 1; i < n; i++) ctx.LineTo(P(i), isStroked: true, isSmoothJoin: false);
+        }
+        geo.Freeze();
+        return geo;
     }
 
     // ── 드래그 힌트 (anchored line + speed glow) ────────────────

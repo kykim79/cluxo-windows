@@ -496,6 +496,26 @@ public class OverlayCoordinatorTests
         Assert.Equal(RingColor.Cyan.Color(), ring!.Value.Color);
         Assert.Equal(RingSize.Medium.Diameter() / 2, ring.Value.Radius); // 27
         Assert.Equal(1.0, ring.Value.Opacity);
+        Assert.Equal(RingShape.Circle, ring.Value.Shape);                 // 기본 모양
+        Assert.Equal(BorderWeight.Thin.LineWidth(), ring.Value.BorderWidth); // 기본 두께 1.5
+        Assert.False(ring.Value.Dashed);
+    }
+
+    [Fact]
+    public void Ring_UsesSettings_ShapeWeightStyle()
+    {
+        var h = new Harness();
+        h.Settings.Store.Set("ringShape", RingShape.Hexagon);
+        h.Settings.Store.Set("borderWeight", BorderWeight.Bold);
+        h.Settings.Store.Set("borderStyle", BorderStyle.Dashed);
+        h.Coordinator.Start();
+        h.Cursor.Position = new PointD(100, 100); // 모니터 A
+        h.Coordinator.RenderFrame();
+
+        var ring = h.Factory.Created["A"].Last!.Value.Ring!.Value;
+        Assert.Equal(RingShape.Hexagon, ring.Shape);
+        Assert.Equal(BorderWeight.Bold.LineWidth(), ring.BorderWidth); // 5.5
+        Assert.True(ring.Dashed);
     }
 
     [Fact]

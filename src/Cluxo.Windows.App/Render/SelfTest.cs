@@ -95,6 +95,54 @@ internal static class SelfTest
 
     private sealed class StubLaunch : ILaunchAtLogin { public bool IsEnabled { get; set; } }
 
+    /// <summary>링 모양(원·둥근사각·마름모·육각) + 점선 렌더 → PNG.</summary>
+    public static int RunRings()
+    {
+        const int cell = 130, h = 190;
+        var variants = new (RingShape shape, bool dashed, string name)[]
+        {
+            (RingShape.Circle, false, "원형"),
+            (RingShape.Squircle, false, "둥근 사각형"),
+            (RingShape.Rhombus, false, "마름모"),
+            (RingShape.Hexagon, false, "육각형"),
+            (RingShape.Circle, true, "점선"),
+        };
+        int w = cell * variants.Length;
+        var canvas = new Canvas { Width = w, Height = h, Background = new SolidColorBrush(Color.FromRgb(32, 32, 38)) };
+
+        for (int i = 0; i < variants.Length; i++)
+        {
+            var (shape, dashed, name) = variants[i];
+            var mon = new MonitorInfo("M", new RectD(i * cell, 0, cell, h), 1.0, true);
+            var el = new OverlayElement(mon, () => 0.0) { Width = cell, Height = h };
+            var ring = new RingVisual(new Rgba(0, 230, 255), 42, 1.0, 1.0, shape, 4.0, dashed);
+            el.SetFrame(new OverlayFrame("M", new PointD(i * cell + cell / 2.0, 80), ring,
+                Array.Empty<DrawingShape>(), BrandingConfig.Default, OverlayEffects.Empty));
+            Canvas.SetLeft(el, i * cell);
+            canvas.Children.Add(el);
+
+            var label = new TextBlock
+            {
+                Text = name, Foreground = Brushes.White, FontSize = 12, Width = cell, TextAlignment = TextAlignment.Center,
+            };
+            Canvas.SetLeft(label, i * cell);
+            Canvas.SetTop(label, 150);
+            canvas.Children.Add(label);
+        }
+
+        canvas.Measure(new Size(w, h));
+        canvas.Arrange(new Rect(0, 0, w, h));
+        canvas.UpdateLayout();
+
+        var rtb = new RenderTargetBitmap(w, h, 96, 96, PixelFormats.Pbgra32);
+        rtb.Render(canvas);
+        string png = Path.Combine(Path.GetTempPath(), "cluxo-selftest-rings.png");
+        var enc = new PngBitmapEncoder();
+        enc.Frames.Add(BitmapFrame.Create(rtb));
+        using (var fs = File.Create(png)) enc.Save(fs);
+        return 0;
+    }
+
     /// <summary>설정창 패널 렌더 → PNG (Window 부모 없이 BuildPanel을 흰 배경에 그린다).</summary>
     public static int RunSettings()
     {

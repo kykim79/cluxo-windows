@@ -59,6 +59,9 @@ public sealed class OverlayCoordinator : IDisposable
     private Rgba _activeColor = RingColor.Cyan.Color();
     private double _ringRadius = RingSize.Medium.Diameter() / 2;
     private double _ringOpacity = 1.0;
+    private RingShape _ringShape = RingShape.Circle;
+    private double _ringBorderWidth = BorderWeight.Thin.LineWidth();
+    private bool _ringDashed;
     private double _animationSpeed = 1.0;
     private double _keystrokeTimeout = 3.0;
 
@@ -216,7 +219,8 @@ public sealed class OverlayCoordinator : IDisposable
             // 링 외형 — CursorSettings 캐시(색·크기·투명도). Scale=1(런타임 모션은 이후 RingMotion 이식 시)
             RingVisual? ring = cursorHere is null
                 ? null
-                : new RingVisual(_activeColor, _ringRadius, Scale: 1.0, _ringOpacity);
+                : new RingVisual(_activeColor, _ringRadius, Scale: 1.0, _ringOpacity,
+                    _ringShape, _ringBorderWidth, _ringDashed);
             // 효과는 이 모니터 영역 것만 (Mac의 per-screen 필터). TODO: 프레임당 Where/ToArray 최적화
             var effects = new OverlayEffects(
                 _effects.Clicks.Where(e => b.Contains(e.Position)).ToArray(),
@@ -270,6 +274,9 @@ public sealed class OverlayCoordinator : IDisposable
             _activeColor = _settingsModel.EffectiveRingColor;        // 모든 Active 효과 accent
             _ringRadius = _settingsModel.RingSize.Diameter() / 2;
             _ringOpacity = _settingsModel.RingOpacity;
+            _ringShape = _settingsModel.RingShape;
+            _ringBorderWidth = _settingsModel.BorderWeight.LineWidth();
+            _ringDashed = _settingsModel.BorderStyle == BorderStyle.Dashed;
             _animationSpeed = _settingsModel.AnimationSpeed.Multiplier();
             _keystrokeTimeout = _settingsModel.KeystrokeTimeout;
             _shake.RequiredDirChanges = _settingsModel.ShakeSensitivity.RequiredDirChanges();

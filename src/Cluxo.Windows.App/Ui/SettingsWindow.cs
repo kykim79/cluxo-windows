@@ -41,6 +41,8 @@ internal sealed class SettingsWindow : Window
         panel.Children.Add(EnumRow("모양", s.RingShape, v => s.RingShape = v, v => v.Label()));
         panel.Children.Add(EnumRow("크기", s.RingSize, v => s.RingSize = v, v => v.Label()));
         panel.Children.Add(SliderRow("투명도", s.RingOpacity, 0.2, 1.0, 0.05, v => s.RingOpacity = v, v => $"{(int)Math.Round(v * 100)}%"));
+        panel.Children.Add(EnumRow("외곽선 두께", s.BorderWeight, v => s.BorderWeight = v, v => v.Label()));
+        panel.Children.Add(EnumRow("선 스타일", s.BorderStyle, v => s.BorderStyle = v, v => v.Label()));
 
         panel.Children.Add(Header("효과"));
         panel.Children.Add(CheckRow("트레일", s.IsTrailEnabled, v => s.IsTrailEnabled = v));
