@@ -29,9 +29,16 @@ public readonly record struct DragVisual(
     PointD Origin, PointD Current, bool AnchoredLineVisible, double Velocity, double Angle,
     bool ShowAngleLabel = false);
 
-/// <summary>라디얼 메뉴 시각 상태 — 콘텐츠는 RadialMenu 트리, 선택은 인덱스. (커서 있는 모니터)</summary>
+/// <summary>
+/// 라디얼 메뉴 시각 상태 — 콘텐츠는 RadialMenu 트리, 선택은 인덱스. (커서 있는 모니터)
+/// CurrentValues(8 sector 현재값)·SubActive·SubSubActive는 코디네이터가 settings/runtime로 계산해
+/// 렌더가 중앙 컨텍스트·현재값 강조에 쓴다(맥 RadialMenuView 대응).
+/// </summary>
 public readonly record struct RadialVisual(
-    bool Visible, PointD Center, int? Sector, int? Sub, int? SubSub);
+    bool Visible, PointD Center, int? Sector, int? Sub, int? SubSub,
+    IReadOnlyList<string>? CurrentValues = null,
+    IReadOnlyList<bool>? SubActive = null,
+    IReadOnlyList<bool>? SubSubActive = null);
 
 /// <summary>한 모니터의 일시적 효과 스냅샷 (해당 모니터 영역 효과만 필터됨).</summary>
 public readonly record struct OverlayEffects(

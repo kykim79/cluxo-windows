@@ -318,80 +318,125 @@ internal sealed class OverlayElement : FrameworkElement
         }
     }
 
-    // ── 라디얼 메뉴 (기본 wedge) ────────────────────────────────
+    // ── 라디얼 메뉴 (맥 RadialMenuView 대응 — 채워진 pie wedge + 중앙 컨텍스트) ──
     private void DrawRadial(DrawingContext dc, OverlayFrame f, Rgba accent)
     {
         if (f.Radial is not { } radial || !radial.Visible) return;
         var center = ToLocal(radial.Center);
         double dead = Tokens.Radial.DeadRadius, main = Tokens.Radial.MainOuter;
-        double sub = Tokens.Radial.SubOuter, subSub = Tokens.Radial.SubSubOuter;
+        double subR = Tokens.Radial.SubOuter, subSubR = Tokens.Radial.SubSubOuter;
+        var guide = StrokePen(Rgba.FromWhite(0.18), 1.0);
 
-        // 활성 깊이까지 veil 배경 + 가이드 원 (라벨 가독성).
-        double outer = radial.SubSub is { } ? subSub : radial.Sub is { } ? sub : main;
-        dc.DrawEllipse(MakeBrush(Tokens.Surface.Veil, 1.0), StrokePen(Rgba.FromWhite(0.22), 1.5, 1.0), center, outer, outer);
-        dc.DrawEllipse(null, StrokePen(Rgba.FromWhite(0.25), 1.5, 1.0), center, dead, dead);
-        if (radial.Sub is { }) dc.DrawEllipse(null, StrokePen(Rgba.FromWhite(0.15), 1.0, 1.0), center, main, main);
-
-        // 선택 sector wedge 강조. dy 반전 후 화면각 β = cw - 90 (cw: 12시=0, 시계방향).
-        if (radial.Sector is { } sel)
-            dc.DrawGeometry(MakeBrush(accent, 0.30), StrokePen(accent, 2, 0.9),
-                PieWedge(center, dead, main, sel * 45.0 - 112.5, sel * 45.0 - 67.5));
-
-        // (1) 8개 메인 sector 라벨 — cw = i*45.
-        double mainR = (dead + main) / 2;
+        // (1) 8개 메인 wedge(채워진 pie) — 선택=accent0.9 / 활성=accent0.35 / 유휴=어두움
         for (int i = 0; i < 8; i++)
         {
-            bool selected = radial.Sector == i;
-            DrawCenteredText(dc, ((RadialMenuItem)i).Label(), Polar(center, mainR, i * 45.0),
-                (double)Tokens.Text.CaptionSmall.Size,
-                selected ? Rgba.FromWhite(0.98) : Rgba.FromWhite(0.45), bold: selected);
+            bool active = radial.Sector == i;
+            bool mainSel = active && radial.Sub is null;
+            Brush fill = mainSel ? MakeBrush(accent, 0.9)
+                       : active ? MakeBrush(accent, 0.35)
+                       : MakeBrush(Tokens.Surface.MainIdle, 1.0);
+            FillWedge(dc, center, dead, main, i * 45.0, 22.5, fill, guide);
+        }
+        for (int i = 0; i < 8; i++)
+        {
+            bool active = radial.Sector == i;
+            DrawCenteredText(dc, ((RadialMenuItem)i).Label(), Polar(center, (dead + main) / 2, i * 45.0),
+                (double)Tokens.Text.CaptionSmall.Size, Rgba.FromWhite(active ? 1.0 : 0.85), bold: active);
         }
 
-        // (2) 잠긴 sector의 sub fan — cursor가 sub ring 이상이면(Sub 선택됨).
-        if (radial.Sector is { } sct && radial.Sub is { })
+        // (2) 활성 sector의 sub fan(채워진 wedge) — 섹터 hover 즉시 펼침(맥). 선택/현재값/branch/leaf 색 구분.
+        if (radial.Sector is { } sct)
         {
             var item = (RadialMenuItem)sct;
             var subs = item.SubItems();
-            double subSpan = item.SubSpan();
-            DrawFan(dc, center, (main + sub) / 2, centerCw: sct * 45.0, span: subSpan,
-                Labels(subs), radial.Sub, accent);
-
-            // (3) branch sub의 subSub fan.
-            if (radial.SubSub is { } && radial.Sub is { } subIdx
-                && subIdx < subs.Count && subs[subIdx].Children is { Count: > 0 } kids)
+            if (subs.Count > 0)
             {
-                double subCenter = RadialHitTest.SubCenterAngle(sct, subIdx, subSpan, subs.Count);
-                DrawFan(dc, center, (sub + subSub) / 2, subCenter, item.SubSubSpan(subIdx),
-                    Labels(kids), radial.SubSub, accent);
+                double subSpan = item.SubSpan(), subStep = subSpan / subs.Count, subStart = sct * 45.0 - subSpan / 2;
+                for (int j = 0; j < subs.Count; j++)
+                {
+                    double cw = subStart + subStep * (j + 0.5);
+                    bool selSub = radial.Sub == j;
+                    bool curSub = radial.SubActive is { } sa && j < sa.Count && sa[j];
+                    bool branch = subs[j].IsBranch;
+                    Brush fill = selSub ? MakeBrush(accent, 0.9)
+                               : curSub ? MakeBrush(accent, 0.40)
+                               : branch ? MakeBrush(accent, Tokens.Radial.BranchFillOpacity)
+                               : MakeBrush(Tokens.Surface.Subtle, 1.0);
+                    FillWedge(dc, center, main, subR, cw, subStep / 2, fill, guide);
+                    DrawCenteredText(dc, subs[j].Label, Polar(center, (main + subR) / 2, cw),
+                        (double)Tokens.Text.Caption.Size, Rgba.FromWhite(1.0), bold: selSub);
+                    if (branch) DrawChevron(dc, center, subR - 9, cw);
+                }
+
+                // (3) 선택된 branch sub의 subSub fan
+                if (radial.Sub is { } subI && subI < subs.Count && subs[subI].Children is { Count: > 0 } kids)
+                {
+                    double subCenter = RadialHitTest.SubCenterAngle(sct, subI, subSpan, subs.Count);
+                    double ssSpan = item.SubSubSpan(subI), ssStep = ssSpan / kids.Count, ssStart = subCenter - ssSpan / 2;
+                    for (int k = 0; k < kids.Count; k++)
+                    {
+                        double cw = ssStart + ssStep * (k + 0.5);
+                        bool selSS = radial.SubSub == k;
+                        bool curSS = radial.SubSubActive is { } sa && k < sa.Count && sa[k];
+                        Brush fill = selSS ? MakeBrush(accent, 0.9)
+                                   : curSS ? MakeBrush(accent, 0.40)
+                                   : MakeBrush(Tokens.Surface.Subtle, 1.0);
+                        FillWedge(dc, center, subR, subSubR, cw, ssStep / 2, fill, guide);
+                        DrawCenteredText(dc, kids[k].Label, Polar(center, (subR + subSubR) / 2, cw),
+                            (double)Tokens.Text.CaptionSmall.Size, Rgba.FromWhite(1.0), bold: selSS);
+                    }
+                }
             }
         }
 
-        // 중앙: 선택 sector 라벨(없으면 힌트).
-        string centerText = radial.Sector is { } cs ? ((RadialMenuItem)cs).Label() : "···";
-        DrawCenteredText(dc, centerText, center, (double)Tokens.Text.Label.Size, accent, bold: true);
-    }
-
-    // centerCw 기준 span을 count칸으로 펼친 라벨 fan. (RadialHitTest.FanIndex와 동일 기하)
-    private void DrawFan(DrawingContext dc, Point center, double radius, double centerCw, double span,
-        IReadOnlyList<string> labels, int? selected, Rgba accent)
-    {
-        int n = labels.Count;
-        if (n == 0) return;
-        double step = span / n, start = centerCw - span / 2;
-        for (int i = 0; i < n; i++)
+        // (4) 중심 — 어두운 원 + 컨텍스트(라벨/현재값) 또는 dead zone "✕ 닫기" (맥의 가운데=close)
+        dc.DrawEllipse(MakeBrush(Tokens.Surface.Veil, 1.0), null, center, dead, dead);
+        if (radial.Sector is { } cs)
         {
-            double cw = start + step * (i + 0.5);
-            bool sel = selected == i;
-            DrawCenteredText(dc, labels[i], Polar(center, radius, cw), (double)Tokens.Text.Caption.Size,
-                sel ? accent : Rgba.FromWhite(0.55), bold: sel);
+            var item = (RadialMenuItem)cs;
+            DrawCenteredText(dc, item.Label(), new Point(center.X, center.Y - 8),
+                (double)Tokens.Text.Caption.Size, Rgba.FromWhite(0.95), bold: true);
+            string detail = RadialDetail(radial, item);
+            if (!string.IsNullOrEmpty(detail))
+                DrawCenteredText(dc, detail, new Point(center.X, center.Y + 10),
+                    (double)Tokens.Text.LabelTiny.Size, Rgba.FromWhite(0.60), bold: false);
+        }
+        else
+        {
+            DrawCenteredText(dc, "✕", new Point(center.X, center.Y - 7), 22, Rgba.FromWhite(0.9), bold: false);
+            DrawCenteredText(dc, "닫기", new Point(center.X, center.Y + 13), (double)Tokens.Text.LabelTiny.Size, Rgba.FromWhite(0.6), bold: false);
         }
     }
 
-    private static IReadOnlyList<string> Labels(IReadOnlyList<RadialSubItem> items)
+    // 중앙에 표시할 상세 — sub/subSub hover면 그 라벨, 아니면 sector 현재값.
+    private static string RadialDetail(RadialVisual radial, RadialMenuItem item)
     {
-        var r = new string[items.Count];
-        for (int i = 0; i < items.Count; i++) r[i] = items[i].Label;
-        return r;
+        var subs = item.SubItems();
+        if (radial.Sub is { } subI && subI < subs.Count)
+        {
+            var subItem = subs[subI];
+            if (radial.SubSub is { } ssI && subItem.Children is { } kids && ssI < kids.Count)
+                return $"{subItem.Label} · {kids[ssI].Label}";
+            return subItem.Label;
+        }
+        int sec = (int)item;
+        return radial.CurrentValues is { } cv && sec < cv.Count ? cv[sec] : "";
+    }
+
+    // cwCenter±cwHalf(cw deg) 범위, r0..r1 채워진 부채꼴.
+    private void FillWedge(DrawingContext dc, Point center, double r0, double r1, double cwCenter, double cwHalf, Brush fill, Pen stroke)
+        => dc.DrawGeometry(fill, stroke, PieWedge(center, r0, r1, (cwCenter - cwHalf) - 90, (cwCenter + cwHalf) - 90));
+
+    // branch sub 바깥에 외향 삼각형(펼침 가능 암시).
+    private void DrawChevron(DrawingContext dc, Point center, double r, double cwDeg)
+    {
+        var tip = Polar(center, r + 6, cwDeg);
+        var b1 = Polar(center, r, cwDeg - 4);
+        var b2 = Polar(center, r, cwDeg + 4);
+        var geo = new StreamGeometry();
+        using (var ctx = geo.Open()) { ctx.BeginFigure(tip, true, true); ctx.LineTo(b1, true, false); ctx.LineTo(b2, true, false); }
+        geo.Freeze();
+        dc.DrawGeometry(MakeBrush(Rgba.FromWhite(0.85), 1.0), null, geo);
     }
 
     // cw 각도(12시=0, 시계방향) + 반지름 → 화면 점. 화면각 β = cw - 90.

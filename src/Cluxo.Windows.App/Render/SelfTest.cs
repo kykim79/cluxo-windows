@@ -175,8 +175,10 @@ internal static class SelfTest
         var monitor = new MonitorInfo("M", new RectD(0, 0, S, S), 1.0, true);
         var el = new OverlayElement(monitor, () => now);
 
+        var values = new[] { "켜짐 · 130pt", "꺼짐", "2/4 켜짐", "보통 (54pt)", "하늘색", "원형", "1/2 켜짐", "꺼짐" };
         var radial = new RadialVisual(Visible: true, Center: new PointD(S / 2.0, S / 2.0),
-            Sector: 0, Sub: 1, SubSub: 2); // Spotlight → 반경(branch) → 140pt
+            Sector: 0, Sub: 1, SubSub: 2, // Spotlight → 반경(branch) → 140pt
+            CurrentValues: values, SubActive: new[] { true, false, false }, SubSubActive: new[] { false, false, true, false, false });
         var frame = new OverlayFrame("M", null, null, Array.Empty<DrawingShape>(),
             BrandingConfig.Default, OverlayEffects.Empty, null, null, radial);
         el.SetFrame(frame);

@@ -242,6 +242,31 @@ public sealed class OverlayCoordinator : IDisposable
         string? keystroke = _keystrokes.IsVisible ? _keystrokes.KeystrokeText : null;
         var result = new List<(IOverlayRenderer, OverlayFrame)>(_renderers.Count);
 
+        // 라디얼 중앙 컨텍스트/현재값 강조 데이터 — 활성 시 1회 계산(모든 모니터 공유). 맥 RadialMenuView 대응.
+        string[]? radialValues = null;
+        bool[]? radialSubActive = null, radialSubSubActive = null;
+        if (_runtime.IsRadialMenuActive)
+        {
+            radialValues = new string[8];
+            for (int i = 0; i < 8; i++)
+                radialValues[i] = ((RadialMenuItem)i).CurrentValue(_settingsModel, _runtime);
+            if (_runtime.RadialMenuSelectedSector is { } sec)
+            {
+                var item = (RadialMenuItem)sec;
+                var subs = item.SubItems();
+                radialSubActive = new bool[subs.Count];
+                for (int s = 0; s < subs.Count; s++)
+                    radialSubActive[s] = item.IsSubCurrent(s, _settingsModel, _runtime);
+                if (_runtime.RadialMenuSelectedSubItem is { } subI && subI < subs.Count
+                    && subs[subI].Children is { Count: > 0 } kids)
+                {
+                    radialSubSubActive = new bool[kids.Count];
+                    for (int k = 0; k < kids.Count; k++)
+                        radialSubSubActive[k] = item.IsSubSubCurrent(subI, k, _settingsModel, _runtime);
+                }
+            }
+        }
+
         foreach (var monitor in _monitors.Monitors)
         {
             if (!_renderers.TryGetValue(monitor.Id, out var renderer)) continue;
@@ -269,7 +294,8 @@ public sealed class OverlayCoordinator : IDisposable
             // 라디얼 메뉴 — 중심이 이 모니터에 있을 때만
             RadialVisual? radial = _runtime.IsRadialMenuActive && b.Contains(_runtime.RadialMenuCenter)
                 ? new RadialVisual(_runtime.IsRadialMenuVisible, _runtime.RadialMenuCenter,
-                    _runtime.RadialMenuSelectedSector, _runtime.RadialMenuSelectedSubItem, _runtime.RadialMenuSelectedSubSubItem)
+                    _runtime.RadialMenuSelectedSector, _runtime.RadialMenuSelectedSubItem, _runtime.RadialMenuSelectedSubSubItem,
+                    radialValues, radialSubActive, radialSubSubActive)
                 : null;
             result.Add((renderer, new OverlayFrame(monitor.Id, cursorHere, ring, shapes, branding, effects, keystroke, drag, radial,
                 _runtime.IsInspectorActive)));
