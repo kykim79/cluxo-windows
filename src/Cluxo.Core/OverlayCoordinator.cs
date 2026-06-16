@@ -27,6 +27,7 @@ public sealed class OverlayCoordinator : IDisposable
     private readonly ISettingsStore _settings;
     private readonly IBrandingProvider _branding;
     private readonly IForegroundAppMonitor _foreground;
+    private readonly IRadialTrigger _radialTrigger;
     private readonly IClock _clock;
 
     private readonly DrawingState _drawing = new();
@@ -34,6 +35,7 @@ public sealed class OverlayCoordinator : IDisposable
     private readonly EffectsState _effects = new();
     private readonly KeystrokeOverlayState _keystrokes = new();
     private readonly CursorRuntimeState _runtime = new();
+    private RadialMenuController _radial;
     private readonly object _gate = new();
     private readonly Dictionary<string, IOverlayRenderer> _renderers = new();
     private readonly List<IDisposable> _hotkeyRegs = new();
@@ -75,16 +77,20 @@ public sealed class OverlayCoordinator : IDisposable
     public double DragVelocity { get { lock (_gate) return _runtime.DragVelocity; } }
     public bool AnchoredLineVisible { get { lock (_gate) return _runtime.AnchoredLineVisible; } }
     public bool IsInspectorActive { get { lock (_gate) return _runtime.IsInspectorActive; } }
+    public bool IsRadialMenuActive { get { lock (_gate) return _runtime.IsRadialMenuActive; } }
+    public bool IsSpotlightActive { get { lock (_gate) return _runtime.IsSpotlightActive; } }
 
     public OverlayCoordinator(
         IMouseHook mouse, IKeyboardHook keyboard, IHotkeyRegistrar hotkeys,
         ICursorPositionSource cursor, IMonitorProvider monitors,
         IOverlayRendererFactory rendererFactory, ISettingsStore settings,
-        IBrandingProvider branding, IForegroundAppMonitor foreground, IClock clock)
+        IBrandingProvider branding, IForegroundAppMonitor foreground,
+        IRadialTrigger radialTrigger, IClock clock)
     {
         _mouse = mouse; _keyboard = keyboard; _hotkeys = hotkeys; _cursor = cursor;
         _monitors = monitors; _rendererFactory = rendererFactory; _settings = settings;
-        _branding = branding; _foreground = foreground; _clock = clock;
+        _branding = branding; _foreground = foreground; _radialTrigger = radialTrigger; _clock = clock;
+        _radial = new RadialMenuController(_settingsModel, _runtime);
     }
 
     /// <summary>설정 로드, 단축키 등록, 입력/모니터 구독, 렌더러 생성, 후킹 시작.</summary>
@@ -95,6 +101,7 @@ public sealed class OverlayCoordinator : IDisposable
         _store = _settings.Load();
         _settingsModel = new CursorSettings(_store);
         _settingsModel.Changed += OnSettingsChanged;
+        _radial = new RadialMenuController(_settingsModel, _runtime); // 로드된 설정으로 재생성
         lock (_gate) _drawing.LineWidth = _store.Get(LineWidthKey, Tokens.Drawing.LineWidth);
         ApplyRuntimeSettings(); // 캐시 채우기 + shake 민감도 적용
 
@@ -110,6 +117,8 @@ public sealed class OverlayCoordinator : IDisposable
         _mouse.HookRemoved += OnHookRemoved;
         _keyboard.KeyPressed += OnKeyPressed;
         _foreground.Changed += OnForegroundChanged;
+        _radialTrigger.Opened += OnRadialOpened;
+        _radialTrigger.Closed += OnRadialClosed;
         _monitors.MonitorsChanged += RebuildRenderers;
 
         RebuildRenderers();
@@ -130,35 +139,44 @@ public sealed class OverlayCoordinator : IDisposable
         lock (_gate)
         {
             _runtime.CursorPosition = pos;
-            bool drawing = _drawing.IsDrawingModeActive;
-            // 흔들기 감지 — 시간은 IClock에서만(wall clock 없음)
-            bool shook = _shake.Record(pos.X, pos.Y, now);
 
-            if (drawing)
+            if (_runtime.IsRadialMenuActive)
             {
-                // 그리기 드래그 경로 — 후킹이 아니라 프레임 샘플 위치를 따라간다(하이브리드 입력)
-                if (_leftDown) _drawing.UpdateShape(pos);
+                // 라디얼 메뉴 모드 — 일반 인터랙션 억제, 커서로 선택만 추적
+                _radial.Update(pos, now);
             }
             else
             {
-                // 일시적 효과는 그리기 모드에선 억제(오버레이가 annotation 전용)
-                if (shook) _effects.AddShake(pos, now, _animationSpeed);
-                _effects.UpdateTrail(pos);
-                if (_leftDown)
+                bool drawing = _drawing.IsDrawingModeActive;
+                // 흔들기 감지 — 시간은 IClock에서만(wall clock 없음)
+                bool shook = _shake.Record(pos.X, pos.Y, now);
+
+                if (drawing)
                 {
-                    _effects.UpdateDragTrail(pos); // 비-그리기 드래그(창 이동 등) streak
-                    // 드래그 모션 — 프레임 샘플 위치 델타로 속도/각도(하이브리드 입력)
-                    double dt = now - _lastDragTime;
-                    if (dt > 0.0001)
+                    // 그리기 드래그 경로 — 후킹이 아니라 프레임 샘플 위치를 따라간다(하이브리드 입력)
+                    if (_leftDown) _drawing.UpdateShape(pos);
+                }
+                else
+                {
+                    // 일시적 효과는 그리기 모드에선 억제(오버레이가 annotation 전용)
+                    if (shook) _effects.AddShake(pos, now, _animationSpeed);
+                    _effects.UpdateTrail(pos);
+                    if (_leftDown)
                     {
-                        double dx = pos.X - _lastDragPos.X, dy = pos.Y - _lastDragPos.Y;
-                        double dist = Math.Sqrt(dx * dx + dy * dy);
-                        _runtime.UpdateDragVelocity(dist / dt);
-                        if (dist > 0.5) _runtime.UpdateDragAngle(Math.Atan2(dy, dx));
-                        _lastDragPos = pos;
-                        _lastDragTime = now;
+                        _effects.UpdateDragTrail(pos); // 비-그리기 드래그(창 이동 등) streak
+                        // 드래그 모션 — 프레임 샘플 위치 델타로 속도/각도(하이브리드 입력)
+                        double dt = now - _lastDragTime;
+                        if (dt > 0.0001)
+                        {
+                            double dx = pos.X - _lastDragPos.X, dy = pos.Y - _lastDragPos.Y;
+                            double dist = Math.Sqrt(dx * dx + dy * dy);
+                            _runtime.UpdateDragVelocity(dist / dt);
+                            if (dist > 0.5) _runtime.UpdateDragAngle(Math.Atan2(dy, dx));
+                            _lastDragPos = pos;
+                            _lastDragTime = now;
+                        }
+                        _runtime.CheckAnchoredLine(pos, now); // #17 거리/시간 임계
                     }
-                    _runtime.CheckAnchoredLine(pos, now); // #17 거리/시간 임계
                 }
             }
 
@@ -201,7 +219,12 @@ public sealed class OverlayCoordinator : IDisposable
             DragVisual? drag = cursorHere is { } cp && _runtime.IsDragging && _runtime.DragOrigin is { } org
                 ? new DragVisual(org, cp, _runtime.AnchoredLineVisible, _runtime.DragVelocity, _runtime.DragAngle)
                 : null;
-            result.Add((renderer, new OverlayFrame(monitor.Id, cursorHere, ring, shapes, branding, effects, keystroke, drag)));
+            // 라디얼 메뉴 — 중심이 이 모니터에 있을 때만
+            RadialVisual? radial = _runtime.IsRadialMenuActive && b.Contains(_runtime.RadialMenuCenter)
+                ? new RadialVisual(_runtime.IsRadialMenuVisible, _runtime.RadialMenuCenter,
+                    _runtime.RadialMenuSelectedSector, _runtime.RadialMenuSelectedSubItem, _runtime.RadialMenuSelectedSubSubItem)
+                : null;
+            result.Add((renderer, new OverlayFrame(monitor.Id, cursorHere, ring, shapes, branding, effects, keystroke, drag, radial)));
         }
         return result;
     }
@@ -259,6 +282,7 @@ public sealed class OverlayCoordinator : IDisposable
         double now = _clock.NowSeconds;
         lock (_gate)
         {
+            if (_runtime.IsRadialMenuActive) return; // 라디얼 모드 — 마우스 클릭 무시(chord hold로 선택)
             if (button == MouseButton.Left) _leftDown = true;
 
             if (_drawing.IsDrawingModeActive)
@@ -289,6 +313,7 @@ public sealed class OverlayCoordinator : IDisposable
         double now = _clock.NowSeconds;
         lock (_gate)
         {
+            if (_runtime.IsRadialMenuActive) return;
             if (button != MouseButton.Left) return;
             _leftDown = false;
             if (_drawing.IsDrawingModeActive)
@@ -301,6 +326,18 @@ public sealed class OverlayCoordinator : IDisposable
                 _runtime.EndDrag();
             }
         }
+    }
+
+    private void OnRadialOpened()
+    {
+        PointD pos = _cursor.GetCursorPosition();
+        double now = _clock.NowSeconds;
+        lock (_gate) _radial.Open(pos, now);
+    }
+
+    private void OnRadialClosed()
+    {
+        lock (_gate) _radial.Close(); // 선택 액션 실행(설정/런타임 변경)
     }
 
     private void ToggleInspector()
@@ -319,7 +356,7 @@ public sealed class OverlayCoordinator : IDisposable
         double now = _clock.NowSeconds;
         lock (_gate)
         {
-            if (_drawing.IsDrawingModeActive) return; // 그리기 모드 — 효과 억제
+            if (_runtime.IsRadialMenuActive || _drawing.IsDrawingModeActive) return; // 효과 억제
             bool isVertical = Math.Abs(delta.Y) >= Math.Abs(delta.X);
             double magnitude = isVertical ? Math.Abs(delta.Y) : Math.Abs(delta.X);
             bool isPositive = isVertical ? delta.Y > 0 : delta.X > 0;
@@ -403,6 +440,8 @@ public sealed class OverlayCoordinator : IDisposable
         _mouse.HookRemoved -= OnHookRemoved;
         _keyboard.KeyPressed -= OnKeyPressed;
         _foreground.Changed -= OnForegroundChanged;
+        _radialTrigger.Opened -= OnRadialOpened;
+        _radialTrigger.Closed -= OnRadialClosed;
         _monitors.MonitorsChanged -= RebuildRenderers;
 
         foreach (var reg in _hotkeyRegs) reg.Dispose();
@@ -411,7 +450,7 @@ public sealed class OverlayCoordinator : IDisposable
         _settings.Save(_store); // 종료 시 설정 flush
 
         _mouse.Stop(); _keyboard.Stop(); _foreground.Stop();
-        _mouse.Dispose(); _keyboard.Dispose(); _hotkeys.Dispose(); _foreground.Dispose();
+        _mouse.Dispose(); _keyboard.Dispose(); _hotkeys.Dispose(); _foreground.Dispose(); _radialTrigger.Dispose();
 
         lock (_gate)
         {

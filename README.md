@@ -37,10 +37,11 @@ dotnet test       # Cluxo.Core 단위 테스트
 | CursorSettings (+값 enum, RadialLabel) | ✅ 이식·테스트(15) | JsonSettingsStore 백업 타입 접근자(Swift 키·기본값). 8개 값 enum, effectiveRingColor, 신뢰 모니터, contentSpan/estLabelWidth. macOS 키코드·RadialMenuItem 트리는 제외(별도) |
 | CursorRuntimeState | ✅ 이식·테스트(9) | 위치·활성 토글·라디얼 선택·드래그 모션. 속도 EMA, anchored line 임계(거리100/시간1s), DragAngleAccumulator 재사용. 스프링 애니메이션·magnifier는 렌더/v1.1 |
 | RadialMenu (RadialMenuItem 트리) | ✅ 이식·테스트(18) | 8 sector 트리(subItems·라벨·desc, 정적), currentValue/isSubCurrent/isSubSubCurrent 상태 로직, SubSpan/SubSubSpan. RadialHitTest 구동. SF Symbol 아이콘은 렌더 계층 |
+| RadialMenuController | ✅ 이식·테스트(11) | hold 상호작용: Open(중심)/Update(선택추적+marking reveal 0.15s)/Close(액션 실행→설정·런타임 변경). 시간 주입 |
 
 추가 Core 타입: `PointD`/`RectD`/`Rgba`(+opacity 팩토리·needsDarkText), `Spring`/`Ease`/`FontToken`(Visuals), `KeyModifiers`/`SpecialKey`.
 
-**Cluxo.Core v1 순수 로직 + 디자인 토큰 이식 완료 — 252 tests green.** (GestureClassifier는 설계대로 제외: Windows에 raw 터치 입력원 없음.)
+**Cluxo.Core v1 순수 로직 + 디자인 토큰 이식 완료 — 266 tests green.** (GestureClassifier는 설계대로 제외: Windows에 raw 터치 입력원 없음.)
 
 ## 네이티브 계층 경계 (`Cluxo.Core.Platform`)
 
@@ -73,9 +74,10 @@ Core 상태 + 플랫폼 인터페이스를 배선하는 중앙 조정자 (Mac `A
 - **키스트로크 배선**(KeystrokeOverlayState): `OnKeyPressed` → `KeyFormat.Format`(게이트로 단순 타이핑 제외) → `ShowKeystroke`, 그리기 토글 → `ShowStatusNotification`, `RenderFrame`에서 `Tick(now)` → `OverlayFrame.Keystroke`.
 - **설정 배선**(CursorSettings): 링 색·크기·투명도(`EffectiveRingColor`/`RingSize`/`RingOpacity`), 그리기 stroke=accent, `AnimationSpeed`→효과 수명, `KeystrokeTimeout`, `ShakeSensitivity`→`ShakeState`. 핫패스 회피 위해 설정을 **캐시**하고 `Changed` 시에만 갱신(+`Save` 디바운스).
 - **런타임 배선**(CursorRuntimeState): 커서 위치 추적, 비-그리기 좌클릭 드래그 → `StartDrag`/`EndDrag` + 프레임 델타로 속도(EMA)·각도·anchored line(거리/시간), `OverlayFrame.Drag`(커서 모니터만). ⌃⌥I → inspector(좌표) 토글.
-- TODO(상태 이식 시 연결): 발표앱 감지 동작, 정지펄스 트리거(idleTimeout), 라디얼 메뉴(RadialMenuItem 트리).
+- **라디얼 배선**(RadialMenuController): `IRadialTrigger`(chord hold) Opened → `Open`(커서=중심), `RenderFrame`에서 `Update`(선택 추적), Closed → `Close`(선택 실행). 라디얼 중 일반 인터랙션 억제. `OverlayFrame.Radial`(중심 모니터만).
+- TODO(상태 이식 시 연결): 발표앱 감지 동작, 정지펄스 트리거(idleTimeout).
 
-**현재 252 tests green.** 다음 단계는 플랫폼 인터페이스의 **네이티브 구현**(Input/Render/Shell)으로, Windows 실행 환경(Parallels VM/미니PC)이 필요.
+**현재 266 tests green.** 다음 단계는 플랫폼 인터페이스의 **네이티브 구현**(Input/Render/Shell)으로, Windows 실행 환경(Parallels VM/미니PC)이 필요.
 
 ## 선행 게이트 (코드 본투자 전)
 

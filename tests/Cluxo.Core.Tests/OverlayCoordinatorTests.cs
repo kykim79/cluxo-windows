@@ -115,6 +115,15 @@ public class OverlayCoordinatorTests
 
     private sealed class FakeClock : IClock { public double NowSeconds { get; set; } }
 
+    private sealed class FakeRadialTrigger : IRadialTrigger
+    {
+        public event Action? Opened;
+        public event Action? Closed;
+        public void Open() => Opened?.Invoke();
+        public void Close() => Closed?.Invoke();
+        public void Dispose() { }
+    }
+
     // ── Harness ─────────────────────────────────────────────────
 
     private sealed class Harness
@@ -128,6 +137,7 @@ public class OverlayCoordinatorTests
         public readonly FakeSettingsStore Settings = new();
         public readonly FakeBranding Branding = new();
         public readonly FakeForeground Foreground = new();
+        public readonly FakeRadialTrigger Radial = new();
         public readonly FakeClock Clock = new();
         public readonly OverlayCoordinator Coordinator;
 
@@ -139,7 +149,7 @@ public class OverlayCoordinatorTests
         {
             Monitors.List.AddRange(monitors.Length == 0 ? new[] { MonA } : monitors);
             Coordinator = new OverlayCoordinator(Mouse, Keyboard, Hotkeys, Cursor, Monitors,
-                Factory, Settings, Branding, Foreground, Clock);
+                Factory, Settings, Branding, Foreground, Radial, Clock);
         }
 
         public void EnterDrawingMode() => Hotkeys.Press(DrawToggle);
@@ -454,6 +464,50 @@ public class OverlayCoordinatorTests
         h.Coordinator.RenderFrame();
         var click = h.Factory.Created["A"].Last!.Value.Effects.Clicks[0];
         Assert.Equal(0.7 * 1.7, click.ExpiresAt, 6);
+    }
+
+    // ── 라디얼 메뉴 배선 ─────────────────────────────────────────
+
+    [Fact]
+    public void Radial_Open_ActivatesAndTracksSelection()
+    {
+        var h = new Harness();
+        h.Coordinator.Start();
+        h.Cursor.Position = new PointD(0, 0); // 중심
+        h.Radial.Open();
+        Assert.True(h.Coordinator.IsRadialMenuActive);
+
+        h.Cursor.Position = new PointD(0, 80); h.Clock.NowSeconds = 0.2; // 12시 메인 → sector 0
+        h.Coordinator.RenderFrame();
+        var radial = h.Factory.Created["A"].Last!.Value.Radial;
+        Assert.NotNull(radial);
+        Assert.True(radial!.Value.Visible);   // reveal threshold(0.15) 경과
+        Assert.Equal(0, radial.Value.Sector); // Spotlight
+    }
+
+    [Fact]
+    public void Radial_Close_ExecutesSelection()
+    {
+        var h = new Harness();
+        h.Coordinator.Start();
+        h.Cursor.Position = new PointD(0, 0);
+        h.Radial.Open();
+        h.Cursor.Position = new PointD(0, 80); h.Clock.NowSeconds = 0.2;
+        h.Coordinator.RenderFrame();        // sector 0 (Spotlight) 메인 선택
+        h.Radial.Close();                   // 실행 → 스포트라이트 토글
+        Assert.True(h.Coordinator.IsSpotlightActive);
+        Assert.False(h.Coordinator.IsRadialMenuActive); // 닫힘
+    }
+
+    [Fact]
+    public void Radial_SuppressesClickEffects()
+    {
+        var h = new Harness();
+        h.Coordinator.Start();
+        h.Radial.Open();
+        h.Mouse.Down(MouseButton.Left, new PointD(100, 100)); // 라디얼 중 클릭 무시
+        h.Coordinator.RenderFrame();
+        Assert.Empty(h.Factory.Created["A"].Last!.Value.Effects.Clicks);
     }
 
     // ── CursorRuntimeState 배선 ──────────────────────────────────

@@ -54,3 +54,14 @@ public interface IHotkeyRegistrar : IDisposable
     /// <summary>chord 등록, 눌릴 때 onPressed 호출. 반환값 Dispose 시 해제.</summary>
     IDisposable Register(HotkeyChord chord, Action onPressed);
 }
+
+/// <summary>
+/// 라디얼 메뉴 hold 트리거 — chord(⌃⌥,)를 누르고 있는 동안 메뉴 활성, 떼면 선택 실행.
+/// RegisterHotKey는 일회성이라 부족 → 네이티브가 키보드 후킹으로 chord down/up을 감지해 알린다.
+/// 메뉴 중심은 코디네이터가 ICursorPositionSource로 읽으므로 인자 없음.
+/// </summary>
+public interface IRadialTrigger : IDisposable
+{
+    event Action? Opened; // chord 눌림(hold 시작)
+    event Action? Closed; // chord 떼임(hold 종료 → 선택 실행)
+}

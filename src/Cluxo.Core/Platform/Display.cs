@@ -22,6 +22,10 @@ public readonly record struct RingVisual(Rgba Color, double Radius, double Scale
 public readonly record struct DragVisual(
     PointD Origin, PointD Current, bool AnchoredLineVisible, double Velocity, double Angle);
 
+/// <summary>라디얼 메뉴 시각 상태 — 콘텐츠는 RadialMenu 트리, 선택은 인덱스. (커서 있는 모니터)</summary>
+public readonly record struct RadialVisual(
+    bool Visible, PointD Center, int? Sector, int? Sub, int? SubSub);
+
 /// <summary>한 모니터의 일시적 효과 스냅샷 (해당 모니터 영역 효과만 필터됨).</summary>
 public readonly record struct OverlayEffects(
     IReadOnlyList<ClickEffect> Clicks,
@@ -52,7 +56,8 @@ public readonly record struct OverlayFrame(
     BrandingConfig Branding,                 // 코브랜딩(워터마크/스플래시 등 렌더에 필요)
     OverlayEffects Effects = default,        // 일시적 효과(모니터별 필터)
     string? Keystroke = null,                // 키스트로크 오버레이 텍스트(보이는 동안만, 렌더가 배치)
-    DragVisual? Drag = null                  // 드래그 시각 힌트(커서 있는 모니터만)
+    DragVisual? Drag = null,                 // 드래그 시각 힌트(커서 있는 모니터만)
+    RadialVisual? Radial = null              // 라디얼 메뉴(중심 있는 모니터만)
 );
 
 /// <summary>
