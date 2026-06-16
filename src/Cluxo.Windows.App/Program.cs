@@ -50,6 +50,18 @@ internal static class Program
             Environment.Exit(0);
             return;
         }
+        if (args.Length > 0 && args[0] == "--settings")
+        {
+            // 트레이 없이 설정창만 단독 표시(편집은 %APPDATA% 영구화). 레이아웃 미리보기 + 독립 편집기.
+            var app = new System.Windows.Application();
+            using var fileStore = new JsonFileSettingsStore();
+            var store = fileStore.Load();
+            var settings = new CursorSettings(store);
+            settings.Changed += () => fileStore.Save(store);
+            app.Run(new Ui.SettingsWindow(settings, new RegistryLaunchAtLogin()));
+            Environment.Exit(0);
+            return;
+        }
 
         // 입력·Shell·렌더 계층은 서로 독립(각자 전용 스레드) → 병렬 생성으로 스레드 기동·WPF init을 겹친다.
         // overlay의 clock 람다는 렌더 시점에만 호출되므로 shell이 그때 준비돼 있으면 된다.
