@@ -38,7 +38,7 @@ dotnet test       # Cluxo.Core 단위 테스트
 
 추가 Core 타입: `PointD`/`RectD`/`Rgba`(+opacity 팩토리·needsDarkText), `Spring`/`Ease`/`FontToken`(Visuals), `KeyModifiers`/`SpecialKey`.
 
-**Cluxo.Core v1 순수 로직 + 디자인 토큰 이식 완료 — 217 tests green.** (GestureClassifier는 설계대로 제외: Windows에 raw 터치 입력원 없음.)
+**Cluxo.Core v1 순수 로직 + 디자인 토큰 이식 완료 — 221 tests green.** (GestureClassifier는 설계대로 제외: Windows에 raw 터치 입력원 없음.)
 
 ## 네이티브 계층 경계 (`Cluxo.Core.Platform`)
 
@@ -69,9 +69,10 @@ Core 상태 + 플랫폼 인터페이스를 배선하는 중앙 조정자 (Mac `A
 - 배선: ⌃⌥D 토글, 좌클릭 그리기 start/end, ESC clear, `[ ]` 두께+영구화, Ctrl+Z undo, 모니터 변경 시 렌더러 재구성, 후킹 분실(T2) → `MouseHookLost`, 종료 시 설정 flush.
 - **효과 배선**(EffectsState): 좌/우클릭 + 더블클릭 감지 → `AddClick`, 스크롤 → `AddScroll`(모니터 영역), 흔들기 감지 → `AddShake`, 매 프레임 트레일/드래그트레일 + `Prune(now)`. 그리기 모드에선 효과 억제. `OverlayFrame`에 모니터별 필터된 `OverlayEffects` 포함.
 - **키스트로크 배선**(KeystrokeOverlayState): `OnKeyPressed` → `KeyFormat.Format`(게이트로 단순 타이핑 제외) → `ShowKeystroke`, 그리기 토글 → `ShowStatusNotification`, `RenderFrame`에서 `Tick(now)` → `OverlayFrame.Keystroke`.
-- TODO(상태 이식 시 연결): 링 외형(CursorSettings), 발표앱 감지 동작, 정지펄스 트리거.
+- **설정 배선**(CursorSettings): 링 색·크기·투명도(`EffectiveRingColor`/`RingSize`/`RingOpacity`), 그리기 stroke=accent, `AnimationSpeed`→효과 수명, `KeystrokeTimeout`, `ShakeSensitivity`→`ShakeState`. 핫패스 회피 위해 설정을 **캐시**하고 `Changed` 시에만 갱신(+`Save` 디바운스).
+- TODO(상태 이식 시 연결): 발표앱 감지 동작, 정지펄스 트리거(idleTimeout), 라디얼 메뉴(RadialMenuItem 트리).
 
-**현재 217 tests green.** 다음 단계는 플랫폼 인터페이스의 **네이티브 구현**(Input/Render/Shell)으로, Windows 실행 환경(Parallels VM/미니PC)이 필요.
+**현재 221 tests green.** 다음 단계는 플랫폼 인터페이스의 **네이티브 구현**(Input/Render/Shell)으로, Windows 실행 환경(Parallels VM/미니PC)이 필요.
 
 ## 선행 게이트 (코드 본투자 전)
 

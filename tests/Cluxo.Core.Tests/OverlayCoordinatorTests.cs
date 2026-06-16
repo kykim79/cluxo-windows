@@ -381,18 +381,78 @@ public class OverlayCoordinatorTests
         Assert.Equal("그리기 모드 ON", h.Coordinator.Keystroke);
     }
 
+    // ── CursorSettings 배선 ──────────────────────────────────────
+
     [Fact]
-    public void Keystroke_AutoHides_AfterTimeout()
+    public void Ring_UsesSettings_ColorSizeOpacity()
+    {
+        var h = new Harness(); // 기본: Cyan, Medium(54)
+        h.Coordinator.Start();
+        h.Cursor.Position = new PointD(100, 100); // 모니터 A
+        h.Coordinator.RenderFrame();
+        var ring = h.Factory.Created["A"].Last!.Value.Ring;
+        Assert.NotNull(ring);
+        Assert.Equal(RingColor.Cyan.Color(), ring!.Value.Color);
+        Assert.Equal(RingSize.Medium.Diameter() / 2, ring.Value.Radius); // 27
+        Assert.Equal(1.0, ring.Value.Opacity);
+    }
+
+    [Fact]
+    public void DrawStroke_UsesEffectiveRingColor_FromSettings()
+    {
+        var h = new Harness();
+        h.Settings.Store.Set("ringColor", RingColor.Red); // Start 전 프리셋
+        h.Coordinator.Start();
+        h.EnterDrawingMode();
+        h.Mouse.Down(MouseButton.Left, new PointD(0, 0));
+        h.Cursor.Position = new PointD(5, 5);
+        h.Coordinator.RenderFrame();
+        h.Mouse.Up(MouseButton.Left, new PointD(5, 5));
+        Assert.Equal(RingColor.Red.Color(), h.Coordinator.DrawingShapes[0].Color);
+    }
+
+    [Fact]
+    public void ShakeSensitivity_Sensitive_DetectsWithFewerChanges()
+    {
+        var h = new Harness();
+        h.Settings.Store.Set("shakeSensitivity", ShakeSensitivity.Sensitive); // 전환 3회
+        h.Coordinator.Start();
+        double[] xs = { 0, 100, 0, 100, 0 }; // 전환 3회 (보통=5라면 미감지)
+        foreach (var x in xs)
+        {
+            h.Cursor.Position = new PointD(x, 0);
+            h.Coordinator.RenderFrame();
+            h.Clock.NowSeconds += 0.05;
+        }
+        Assert.NotEmpty(h.Factory.Created["A"].Last!.Value.Effects.Shakes);
+    }
+
+    [Fact]
+    public void KeystrokeTimeout_ComesFromSettings_Default3s()
     {
         var h = new Harness();
         h.Coordinator.Start();
         h.Clock.NowSeconds = 0;
         h.Keyboard.Press(new KeyEvent(KeyModifiers.Control, null, "c"));
         h.Coordinator.RenderFrame();
+        h.Clock.NowSeconds = 1.5; // 옛 하드코딩(1.5)이면 여기서 숨음 — 설정 기본 3.0이라 유지
+        h.Coordinator.RenderFrame();
         Assert.Equal("Ctrl+C", h.Coordinator.Keystroke);
-
-        h.Clock.NowSeconds = 1.5; // 기본 timeout 경과
+        h.Clock.NowSeconds = 3.0;
         h.Coordinator.RenderFrame();
         Assert.Null(h.Coordinator.Keystroke);
+    }
+
+    [Fact]
+    public void ClickEffectLifetime_ScaledByAnimationSpeed()
+    {
+        var h = new Harness();
+        h.Settings.Store.Set("animationSpeed", AnimationSpeed.Slow); // ×1.7
+        h.Coordinator.Start();
+        h.Clock.NowSeconds = 0;
+        h.Mouse.Down(MouseButton.Left, new PointD(100, 100));
+        h.Coordinator.RenderFrame();
+        var click = h.Factory.Created["A"].Last!.Value.Effects.Clicks[0];
+        Assert.Equal(0.7 * 1.7, click.ExpiresAt, 6);
     }
 }

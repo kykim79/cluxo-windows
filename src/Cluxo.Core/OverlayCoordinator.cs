@@ -38,6 +38,7 @@ public sealed class OverlayCoordinator : IDisposable
     private readonly List<IDisposable> _hotkeyRegs = new();
 
     private JsonSettingsStore _store = new();
+    private CursorSettings _settingsModel = new(new JsonSettingsStore());
     private KeyModifiers _modifiers;
     private bool _leftDown;
     private bool _running;
@@ -46,15 +47,17 @@ public sealed class OverlayCoordinator : IDisposable
     // 더블클릭 감지 — 같은 위치 근처 0.4초 내 두 번째 좌클릭.
     private double _lastLeftDownTime = double.NegativeInfinity;
     private PointD _lastLeftDownPos;
-    private double _animationSpeed = 1.0;   // CursorSettings 이식 시 그쪽에서
-    private double _keystrokeTimeout = 1.5;  // CursorSettings 이식 시 그쪽에서
+
+    // 설정 캐시 — 60Hz 핫패스에서 매 프레임 store를 읽지 않게 ApplyRuntimeSettings에서만 갱신.
+    private Rgba _activeColor = RingColor.Cyan.Color();
+    private double _ringRadius = RingSize.Medium.Diameter() / 2;
+    private double _ringOpacity = 1.0;
+    private double _animationSpeed = 1.0;
+    private double _keystrokeTimeout = 3.0;
 
     private const string LineWidthKey = "drawing.lineWidth";
     private const double DoubleClickWindow = 0.4;
     private const double DoubleClickRadius = 6;
-
-    /// <summary>그리기 색 — CursorSettings.ringColor 이식 시 그쪽에서. 임시 기본 빨강.</summary>
-    public Rgba DrawColor { get; set; } = Rgba.Red;
 
     /// <summary>마우스 후킹 분실(T2) — 구현이 재설치하고, 코디네이터가 트레이/알림에 surface.</summary>
     public event Action? MouseHookLost;
@@ -81,7 +84,10 @@ public sealed class OverlayCoordinator : IDisposable
         if (_running) return;
 
         _store = _settings.Load();
+        _settingsModel = new CursorSettings(_store);
+        _settingsModel.Changed += OnSettingsChanged;
         lock (_gate) _drawing.LineWidth = _store.Get(LineWidthKey, Tokens.Drawing.LineWidth);
+        ApplyRuntimeSettings(); // 캐시 채우기 + shake 민감도 적용
 
         // ⌃⌥D → 그리기 모드 토글 (Mac과 동일 단축키)
         _hotkeyRegs.Add(_hotkeys.Register(
@@ -151,10 +157,10 @@ public sealed class OverlayCoordinator : IDisposable
             if (!_renderers.TryGetValue(monitor.Id, out var renderer)) continue;
             var b = monitor.Bounds;
             PointD? cursorHere = b.Contains(pos) ? pos : null;
-            // 링 외형은 CursorSettings/RingAppearance 이식 시 — 지금은 토큰 기반 기본값
+            // 링 외형 — CursorSettings 캐시(색·크기·투명도). Scale=1(런타임 모션은 이후 RingMotion 이식 시)
             RingVisual? ring = cursorHere is null
                 ? null
-                : new RingVisual(DrawColor, Radius: 24, Scale: 1.0, Opacity: 1.0);
+                : new RingVisual(_activeColor, _ringRadius, Scale: 1.0, _ringOpacity);
             // 효과는 이 모니터 영역 것만 (Mac의 per-screen 필터). TODO: 프레임당 Where/ToArray 최적화
             var effects = new OverlayEffects(
                 _effects.Clicks.Where(e => b.Contains(e.Position)).ToArray(),
@@ -167,6 +173,26 @@ public sealed class OverlayCoordinator : IDisposable
             result.Add((renderer, new OverlayFrame(monitor.Id, cursorHere, ring, shapes, branding, effects, keystroke)));
         }
         return result;
+    }
+
+    // 설정값을 캐시로 반영 + shake 민감도 적용. Start와 설정 변경 시에만 호출(핫패스 아님).
+    private void ApplyRuntimeSettings()
+    {
+        lock (_gate)
+        {
+            _activeColor = _settingsModel.EffectiveRingColor;        // 모든 Active 효과 accent
+            _ringRadius = _settingsModel.RingSize.Diameter() / 2;
+            _ringOpacity = _settingsModel.RingOpacity;
+            _animationSpeed = _settingsModel.AnimationSpeed.Multiplier();
+            _keystrokeTimeout = _settingsModel.KeystrokeTimeout;
+            _shake.RequiredDirChanges = _settingsModel.ShakeSensitivity.RequiredDirChanges();
+        }
+    }
+
+    private void OnSettingsChanged()
+    {
+        ApplyRuntimeSettings();
+        _settings.Save(_store); // 플랫폼 구현이 디바운스
     }
 
     private MonitorInfo? MonitorContaining(PointD point)
@@ -207,7 +233,7 @@ public sealed class OverlayCoordinator : IDisposable
             if (_drawing.IsDrawingModeActive)
             {
                 if (button == MouseButton.Left)
-                    _drawing.StartShape(point, _modifiers, DrawColor);
+                    _drawing.StartShape(point, _modifiers, _activeColor); // stroke도 accent 따름(DESIGN.md)
                 return; // 그리기 모드 — 클릭 효과 억제
             }
 
@@ -316,6 +342,7 @@ public sealed class OverlayCoordinator : IDisposable
         _disposed = true;
         _running = false;
 
+        _settingsModel.Changed -= OnSettingsChanged;
         _mouse.ButtonDown -= OnButtonDown;
         _mouse.ButtonUp -= OnButtonUp;
         _mouse.Scrolled -= OnScrolled;
