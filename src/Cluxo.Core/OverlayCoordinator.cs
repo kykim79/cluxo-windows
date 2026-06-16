@@ -55,14 +55,12 @@ public sealed class OverlayCoordinator : IDisposable
     private PointD _lastDragPos;
     private double _lastDragTime;
 
-    // 가운데 버튼 long-press 라디얼 트리거 (키 chord 앱 충돌 회피용). 가운데 버튼은 후킹에서 흡수.
-    private bool _middleDown;
-    private bool _midRadialPending;
-    private double _midPressStart;
-    private PointD _midPressPos;
+    // 가운데 버튼 라디얼 트리거 (키 chord 앱 충돌 회피용). 가운데 버튼은 후킹에서 흡수.
+    // 모델: 클릭으로 열어 유지(맥식) + 다시 클릭/가운데=닫기. 눌러 끌어 떼면 한 번에 선택(마킹).
     private bool _radialByMiddle;
-    private const double MiddleRadialHold = 0.25;   // 이 시간 홀드 → 라디얼 오픈
-    private const double MiddleRadialDeadband = 6;  // 홀드 중 이 이상 이동 → 취소(드래그)
+    private bool _midOpenedThisPress; // 직전 누름이 메뉴를 열었나(press-drag-release 판정용)
+    private PointD _midDownPos;
+    private const double MiddleMoveDeadband = 6; // 누른 뒤 이 이상 이동하면 마킹 제스처로 간주
 
     // 설정 캐시 — 60Hz 핫패스에서 매 프레임 store를 읽지 않게 ApplyRuntimeSettings에서만 갱신.
     private Rgba _activeColor = RingColor.Cyan.Color();
@@ -172,23 +170,6 @@ public sealed class OverlayCoordinator : IDisposable
         lock (_gate)
         {
             _runtime.CursorPosition = pos;
-
-            // 가운데 버튼 long-press → 라디얼 오픈(움직이면 취소). 홀드로 의도 확정 → 즉시 표시.
-            if (_midRadialPending && _middleDown && !_runtime.IsRadialMenuActive && !_drawing.IsDrawingModeActive)
-            {
-                double mdx = pos.X - _midPressPos.X, mdy = pos.Y - _midPressPos.Y;
-                if (mdx * mdx + mdy * mdy > MiddleRadialDeadband * MiddleRadialDeadband)
-                {
-                    _midRadialPending = false;
-                }
-                else if (now - _midPressStart >= MiddleRadialHold)
-                {
-                    _radial.Open(_midPressPos, now);
-                    _runtime.IsRadialMenuVisible = true;
-                    _radialByMiddle = true;
-                    _midRadialPending = false;
-                }
-            }
 
             if (_runtime.IsRadialMenuActive)
             {
@@ -386,20 +367,29 @@ public sealed class OverlayCoordinator : IDisposable
         double now = _clock.NowSeconds;
         lock (_gate)
         {
-            if (_runtime.IsRadialMenuActive) return; // 라디얼 모드 — 마우스 클릭 무시(chord/가운데 hold로 선택)
-
-            // 가운데 버튼 — 라디얼 long-press 전용(클릭 효과/드래그 없음, 후킹에서 앱으론 흡수됨)
+            // 가운데 버튼 — 라디얼 토글(클릭으로 열고 유지, 다시 클릭/가운데=닫기). 앱으론 후킹이 흡수.
             if (button == MouseButton.Middle)
             {
-                _middleDown = true;
-                if (!_drawing.IsDrawingModeActive)
+                if (_drawing.IsDrawingModeActive) return;
+                if (_runtime.IsRadialMenuActive && _radialByMiddle)
                 {
-                    _midRadialPending = true;
-                    _midPressStart = now;
-                    _midPressPos = point;
+                    _radial.Update(point, now); // 클릭 지점 선택 확정
+                    _radial.Close();            // 실행(가운데 dead zone이면 취소) 후 닫기
+                    _radialByMiddle = false;
+                    _midOpenedThisPress = false;
+                }
+                else if (!_runtime.IsRadialMenuActive)
+                {
+                    _radial.Open(point, now);   // 열고 유지
+                    _runtime.IsRadialMenuVisible = true;
+                    _radialByMiddle = true;
+                    _midOpenedThisPress = true;
+                    _midDownPos = point;
                 }
                 return;
             }
+
+            if (_runtime.IsRadialMenuActive) return; // 라디얼 중 좌/우 클릭 무시
 
             if (button == MouseButton.Left) _leftDown = true;
 
@@ -431,16 +421,21 @@ public sealed class OverlayCoordinator : IDisposable
         double now = _clock.NowSeconds;
         lock (_gate)
         {
-            // 가운데 버튼 뗌 — long-press로 라디얼이 열렸으면 닫고(선택 실행), 아니면 pending 취소
+            // 가운데 버튼 뗌 — 이 누름이 메뉴를 열었고 커서가 눌린 지점에서 벗어났으면(눌러 끌어 떼기)
+            // 그 자리 선택 실행+닫기(마킹). 제자리 탭이면 유지(클릭 토글 모드).
             if (button == MouseButton.Middle)
             {
-                _middleDown = false;
-                _midRadialPending = false;
-                if (_runtime.IsRadialMenuActive && _radialByMiddle)
+                if (_runtime.IsRadialMenuActive && _radialByMiddle && _midOpenedThisPress)
                 {
-                    _radial.Close();
-                    _radialByMiddle = false;
+                    double mdx = point.X - _midDownPos.X, mdy = point.Y - _midDownPos.Y;
+                    if (mdx * mdx + mdy * mdy > MiddleMoveDeadband * MiddleMoveDeadband)
+                    {
+                        _radial.Update(point, now);
+                        _radial.Close();
+                        _radialByMiddle = false;
+                    }
                 }
+                _midOpenedThisPress = false;
                 return;
             }
 
