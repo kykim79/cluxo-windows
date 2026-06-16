@@ -55,6 +55,15 @@ public sealed class OverlayCoordinator : IDisposable
     private PointD _lastDragPos;
     private double _lastDragTime;
 
+    // 가운데 버튼 long-press 라디얼 트리거 (키 chord 앱 충돌 회피용). 가운데 버튼은 후킹에서 흡수.
+    private bool _middleDown;
+    private bool _midRadialPending;
+    private double _midPressStart;
+    private PointD _midPressPos;
+    private bool _radialByMiddle;
+    private const double MiddleRadialHold = 0.25;   // 이 시간 홀드 → 라디얼 오픈
+    private const double MiddleRadialDeadband = 6;  // 홀드 중 이 이상 이동 → 취소(드래그)
+
     // 설정 캐시 — 60Hz 핫패스에서 매 프레임 store를 읽지 않게 ApplyRuntimeSettings에서만 갱신.
     private Rgba _activeColor = RingColor.Cyan.Color();
     private double _ringRadius = RingSize.Medium.Diameter() / 2;
@@ -163,6 +172,23 @@ public sealed class OverlayCoordinator : IDisposable
         lock (_gate)
         {
             _runtime.CursorPosition = pos;
+
+            // 가운데 버튼 long-press → 라디얼 오픈(움직이면 취소). 홀드로 의도 확정 → 즉시 표시.
+            if (_midRadialPending && _middleDown && !_runtime.IsRadialMenuActive && !_drawing.IsDrawingModeActive)
+            {
+                double mdx = pos.X - _midPressPos.X, mdy = pos.Y - _midPressPos.Y;
+                if (mdx * mdx + mdy * mdy > MiddleRadialDeadband * MiddleRadialDeadband)
+                {
+                    _midRadialPending = false;
+                }
+                else if (now - _midPressStart >= MiddleRadialHold)
+                {
+                    _radial.Open(_midPressPos, now);
+                    _runtime.IsRadialMenuVisible = true;
+                    _radialByMiddle = true;
+                    _midRadialPending = false;
+                }
+            }
 
             if (_runtime.IsRadialMenuActive)
             {
@@ -360,7 +386,21 @@ public sealed class OverlayCoordinator : IDisposable
         double now = _clock.NowSeconds;
         lock (_gate)
         {
-            if (_runtime.IsRadialMenuActive) return; // 라디얼 모드 — 마우스 클릭 무시(chord hold로 선택)
+            if (_runtime.IsRadialMenuActive) return; // 라디얼 모드 — 마우스 클릭 무시(chord/가운데 hold로 선택)
+
+            // 가운데 버튼 — 라디얼 long-press 전용(클릭 효과/드래그 없음, 후킹에서 앱으론 흡수됨)
+            if (button == MouseButton.Middle)
+            {
+                _middleDown = true;
+                if (!_drawing.IsDrawingModeActive)
+                {
+                    _midRadialPending = true;
+                    _midPressStart = now;
+                    _midPressPos = point;
+                }
+                return;
+            }
+
             if (button == MouseButton.Left) _leftDown = true;
 
             if (_drawing.IsDrawingModeActive)
@@ -391,6 +431,19 @@ public sealed class OverlayCoordinator : IDisposable
         double now = _clock.NowSeconds;
         lock (_gate)
         {
+            // 가운데 버튼 뗌 — long-press로 라디얼이 열렸으면 닫고(선택 실행), 아니면 pending 취소
+            if (button == MouseButton.Middle)
+            {
+                _middleDown = false;
+                _midRadialPending = false;
+                if (_runtime.IsRadialMenuActive && _radialByMiddle)
+                {
+                    _radial.Close();
+                    _radialByMiddle = false;
+                }
+                return;
+            }
+
             if (_runtime.IsRadialMenuActive) return;
             if (button != MouseButton.Left) return;
             _leftDown = false;

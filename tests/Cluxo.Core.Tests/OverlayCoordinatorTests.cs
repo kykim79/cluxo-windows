@@ -670,6 +670,50 @@ public class OverlayCoordinatorTests
         Assert.Empty(h.Factory.Created["A"].Last!.Value.Effects.Clicks);
     }
 
+    [Fact]
+    public void MiddleButton_LongPress_OpensRadial_ThenCloses()
+    {
+        var h = new Harness();
+        h.Coordinator.Start();
+        h.Clock.NowSeconds = 0;
+        h.Mouse.Down(MouseButton.Middle, new PointD(100, 100)); // 가운데 누름(pending)
+
+        h.Cursor.Position = new PointD(100, 100);
+        h.Coordinator.RenderFrame();                 // hold 미달
+        Assert.False(h.Coordinator.IsRadialMenuActive);
+
+        h.Clock.NowSeconds = 0.3;                     // hold 0.25s 경과
+        h.Coordinator.RenderFrame();
+        Assert.True(h.Coordinator.IsRadialMenuActive); // 라디얼 오픈
+
+        h.Mouse.Up(MouseButton.Middle, new PointD(100, 100)); // 뗌 → 닫힘(실행)
+        Assert.False(h.Coordinator.IsRadialMenuActive);
+    }
+
+    [Fact]
+    public void MiddleButton_NoClickEffect()
+    {
+        var h = new Harness();
+        h.Coordinator.Start();
+        h.Mouse.Down(MouseButton.Middle, new PointD(100, 100));
+        h.Coordinator.RenderFrame();
+        Assert.Empty(h.Factory.Created["A"].Last!.Value.Effects.Clicks); // 가운데는 클릭 효과 없음
+    }
+
+    [Fact]
+    public void MiddleButton_MovedBeyondDeadband_DoesNotOpen()
+    {
+        var h = new Harness();
+        h.Coordinator.Start();
+        h.Clock.NowSeconds = 0;
+        h.Mouse.Down(MouseButton.Middle, new PointD(100, 100));
+        h.Cursor.Position = new PointD(140, 100); // deadband 초과 → 취소(드래그)
+        h.Coordinator.RenderFrame();
+        h.Clock.NowSeconds = 0.3;
+        h.Coordinator.RenderFrame();
+        Assert.False(h.Coordinator.IsRadialMenuActive);
+    }
+
     // ── CursorRuntimeState 배선 ──────────────────────────────────
 
     [Fact]

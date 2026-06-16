@@ -40,6 +40,13 @@ public sealed class Win32InputLayer : IDisposable
     /// <summary>진단용 — 모든 키 전이(vk, down, 모디파이어)를 sink로 흘린다(--diag).</summary>
     public void EnableKeyDiag(Action<uint, bool, Cluxo.Core.KeyModifiers> sink) => _thread.RawKeyDiag += sink;
 
+    /// <summary>가운데 버튼을 Cluxo 라디얼 전용으로 흡수할지(true=앱에 안 보냄). 기본 true.</summary>
+    public bool SuppressMiddleButton
+    {
+        get => _thread.SuppressMiddleButton;
+        set => _thread.SuppressMiddleButton = value;
+    }
+
     public void Dispose()
     {
         if (_disposed) return;

@@ -51,6 +51,9 @@ internal sealed class LowLevelInputThread : IDisposable
     private bool _disposed;
     private readonly object _lifecycle = new();
 
+    /// <summary>가운데 버튼을 앱에 전달하지 않고 흡수(Cluxo 라디얼 전용). 후킹 콜백에서 읽음.</summary>
+    public volatile bool SuppressMiddleButton = true;
+
     // 고수준 이벤트 (디스패치 스레드에서 발생)
     public event Action<MouseButton, PointD>? ButtonDown;
     public event Action<MouseButton, PointD>? ButtonUp;
@@ -146,6 +149,7 @@ internal sealed class LowLevelInputThread : IDisposable
     // ── 후킹 콜백 (펌프 스레드) — 반드시 O(1): enqueue 후 즉시 반환 ──
     private IntPtr MouseProc(int nCode, IntPtr wParam, IntPtr lParam)
     {
+        bool suppress = false;
         if (nCode >= HC_ACTION)
         {
             var ms = Marshal.PtrToStructure<MSLLHOOKSTRUCT>(lParam);
@@ -156,14 +160,16 @@ internal sealed class LowLevelInputThread : IDisposable
                 case WM_LBUTTONUP: Enqueue(RawKind.ButtonUp, MouseButton.Left, pt); break;
                 case WM_RBUTTONDOWN: Enqueue(RawKind.ButtonDown, MouseButton.Right, pt); break;
                 case WM_RBUTTONUP: Enqueue(RawKind.ButtonUp, MouseButton.Right, pt); break;
-                case WM_MBUTTONDOWN: Enqueue(RawKind.ButtonDown, MouseButton.Middle, pt); break;
-                case WM_MBUTTONUP: Enqueue(RawKind.ButtonUp, MouseButton.Middle, pt); break;
+                // 가운데 버튼은 Cluxo 라디얼 전용 → 앱으로 보내지 않고 흡수(autoscroll·탭닫기 등 부작용 방지)
+                case WM_MBUTTONDOWN: Enqueue(RawKind.ButtonDown, MouseButton.Middle, pt); suppress = SuppressMiddleButton; break;
+                case WM_MBUTTONUP: Enqueue(RawKind.ButtonUp, MouseButton.Middle, pt); suppress = SuppressMiddleButton; break;
                 case WM_MOUSEWHEEL: EnqueueScroll(new ScrollDelta(0, WheelDelta(ms.mouseData) / 120.0), pt); break;
                 case WM_MOUSEHWHEEL: EnqueueScroll(new ScrollDelta(WheelDelta(ms.mouseData) / 120.0, 0), pt); break;
                 // WM_MOUSEMOVE → 무시 (위치는 ICursorPositionSource 폴링)
             }
         }
-        return CallNextHookEx(IntPtr.Zero, nCode, wParam, lParam);
+        // suppress면 CallNextHookEx 호출 안 함 → 이벤트가 앱에 전달되지 않음
+        return suppress ? new IntPtr(1) : CallNextHookEx(IntPtr.Zero, nCode, wParam, lParam);
     }
 
     private IntPtr KeyboardProc(int nCode, IntPtr wParam, IntPtr lParam)
