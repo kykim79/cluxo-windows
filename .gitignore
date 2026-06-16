@@ -6,6 +6,10 @@ obj/
 publish/
 publish-r2r/
 
+# 인증서·키 (절대 커밋 금지)
+*.pfx
+*.snk
+
 # Rider / VS / VS Code
 .idea/
 .vs/

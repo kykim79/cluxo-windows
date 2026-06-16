@@ -40,8 +40,49 @@ jobs:
         if: hashFiles('Cluxo.Windows.sln') != ''
         run: dotnet test Cluxo.Windows.sln --configuration Release --no-build
 
-      # ── TODO (T9 — 배포 단계) ─────────────────────────────────
-      # - 코드사이닝: signtool.exe (OV/EV 인증서를 GitHub secret으로). SmartScreen 마찰 제거.
-      # - MSIX 패키징: makeappx.exe 또는 .wapproj. 추후 Store 등록(설계상 직접배포 우선).
-      # - RID: win-x64 / win-arm64 publish 결정. 아티팩트 업로드(actions/upload-artifact).
-      # - 인증서·키는 repo secret으로만(평문 커밋 금지).
+  # ── 배포 퍼블리시 + 코드사이닝 (T9) — 수동 실행 ──────────────
+  # self-contained 단일 exe 퍼블리시 → (인증서 secret 있으면) 서명 → 아티팩트 업로드.
+  # 시크릿: SIGN_PFX_BASE64(PFX를 base64), SIGN_PFX_PASSWORD. 없으면 미서명으로 업로드.
+  publish:
+    runs-on: windows-latest
+    if: github.event_name == 'workflow_dispatch'
+    env:
+      PFX_B64: ${{ secrets.SIGN_PFX_BASE64 }}
+      PFX_PW: ${{ secrets.SIGN_PFX_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Guard — 윈도우 솔루션 존재 확인
+        shell: pwsh
+        run: |
+          if (-not (Test-Path 'Cluxo.Windows.sln')) {
+            Write-Host '::notice::Cluxo.Windows.sln 없음 — 스킵.'
+            exit 0
+          }
+
+      - name: Publish (self-contained 단일 exe, win-x64)
+        if: hashFiles('Cluxo.Windows.sln') != ''
+        shell: pwsh
+        run: pwsh scripts/publish.ps1 -Rid win-x64
+
+      - name: Code sign (인증서 secret 있을 때만; windows-latest엔 signtool 내장)
+        if: env.PFX_B64 != '' && hashFiles('Cluxo.Windows.sln') != ''
+        shell: pwsh
+        run: |
+          [IO.File]::WriteAllBytes("$env:RUNNER_TEMP/cert.pfx", [Convert]::FromBase64String($env:PFX_B64))
+          pwsh scripts/sign.ps1 -File publish/win-x64/Cluxo.Windows.App.exe -PfxPath "$env:RUNNER_TEMP/cert.pfx" -PfxPassword $env:PFX_PW
+          Remove-Item "$env:RUNNER_TEMP/cert.pfx" -Force
+
+      - name: Upload artifact
+        if: hashFiles('Cluxo.Windows.sln') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: Cluxo-win-x64
+          path: publish/win-x64/Cluxo.Windows.App.exe
+
+      # ── 남은 T9: MSIX/.wapproj 패키징(직접배포 우선이라 후순위), EV 토큰 서명(HSM) ──
