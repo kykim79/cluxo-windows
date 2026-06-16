@@ -195,4 +195,4 @@ git push          ───────▶       dotnet build Cluxo.Windows.sln
 - **ARM VM은 실하드웨어가 아니다**: GPU 투명 합성·Per-Monitor DPI·멀티모니터 정합은 VM이 가린다. **출시 전 회사 자금 Windows 미니PC(x64)에서 최종 QA** (설계 T10).
 - **코드사이닝**: SmartScreen 마찰 제거에 OV(가능하면 EV) 인증서 필요 — 배포 직전 (설계 T9). 개발 중엔 불필요.
 - **CI**: GitHub Actions `windows-latest`에서 `dotnet build Cluxo.Windows.sln` + (추후) MSIX/서명. `Cluxo.sln`(Core) 워크플로와 별도 잡.
-- **선행 게이트 T4**: 코드 본투자(서명·MSI·배포) 전에, **파일럿 고객사에서 직원이 이 .exe/MSI를 실제로 설치·실행할 수 있는지**(EDR/AV/GPO) 데모로 확인. 대표가 파일럿 고객사를 지목·소개.
+- **배포(T4 해소)**: 고객사 환경에서 설치·실행 가능 확인됨(현장 판단). "IT 차단" 우려는 게이트 아님. 남은 건 패키징(서명 .exe/MSI) 선택.
