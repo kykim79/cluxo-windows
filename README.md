@@ -33,10 +33,11 @@ dotnet test       # Cluxo.Core 단위 테스트
 | BrandingConfig | ✅ 이식·테스트(11) | 코브랜딩 런타임 주입 + HMAC 무결성(변조/미서명 → 순정 fallback). 외부보이스 P1(T3) |
 | Tokens (DESIGN.md 전체) | ✅ 이식·테스트(19) | Surface/Stroke/Motion/Radial/Radius/Spacing/Drawing/Text 전체. SwiftUI 타입→플랫폼 무관 데이터 |
 | EffectsState | ✅ 이식·테스트(15) | 클릭/스크롤/흔들기/정지펄스/트레일 큐. Task.sleep→시간주입 Prune(now)로 대체(결정적). 트랙패드/클립보드 제외 |
+| KeystrokeOverlayState | ✅ 이식·테스트(6) | 키스트로크/상태알림 표시 + 자동 숨김. Task.sleep→시간주입 Tick(now) |
 
 추가 Core 타입: `PointD`/`RectD`/`Rgba`(+opacity 팩토리·needsDarkText), `Spring`/`Ease`/`FontToken`(Visuals), `KeyModifiers`/`SpecialKey`.
 
-**Cluxo.Core v1 순수 로직 + 디자인 토큰 이식 완료 — 186 tests green.** (GestureClassifier는 설계대로 제외: Windows에 raw 터치 입력원 없음.)
+**Cluxo.Core v1 순수 로직 + 디자인 토큰 이식 완료 — 198 tests green.** (GestureClassifier는 설계대로 제외: Windows에 raw 터치 입력원 없음.)
 
 ## 네이티브 계층 경계 (`Cluxo.Core.Platform`)
 
@@ -68,7 +69,7 @@ Core 상태 + 플랫폼 인터페이스를 배선하는 중앙 조정자 (Mac `A
 - **효과 배선**(EffectsState): 좌/우클릭 + 더블클릭 감지 → `AddClick`, 스크롤 → `AddScroll`(모니터 영역), 흔들기 감지 → `AddShake`, 매 프레임 트레일/드래그트레일 + `Prune(now)`. 그리기 모드에선 효과 억제. `OverlayFrame`에 모니터별 필터된 `OverlayEffects` 포함.
 - TODO(상태 이식 시 연결): 링 외형(CursorSettings), 키스트로크 오버레이, 발표앱 감지 동작, 정지펄스 트리거.
 
-**현재 192 tests green.** 다음 단계는 플랫폼 인터페이스의 **네이티브 구현**(Input/Render/Shell)으로, Windows 실행 환경(Parallels VM/미니PC)이 필요.
+**현재 198 tests green.** 다음 단계는 플랫폼 인터페이스의 **네이티브 구현**(Input/Render/Shell)으로, Windows 실행 환경(Parallels VM/미니PC)이 필요.
 
 ## 선행 게이트 (코드 본투자 전)
 
