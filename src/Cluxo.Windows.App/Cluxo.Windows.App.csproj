@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    네이티브 Windows 계층. net8.0-windows라 macOS/Linux에서는 빌드 불가 →
+    Mac용 Cluxo.sln에는 넣지 않는다(ubuntu Core CI 보호). Cluxo.Windows.sln에서만 묶는다.
+
+    현재 마일스톤: 입력 계층(Input/). 아직 진입점(Program.cs)·렌더가 없어 classlib로 둔다.
+    렌더 계층 착수 시 OutputType=WinExe + UseWPF(설정창) + app.manifest(PerMonitorV2)로 승격.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Cluxo.Core\Cluxo.Core.csproj" />
+  </ItemGroup>
+
+  <!-- 입력 계층 순수 로직(internal)을 단위 테스트에 노출 -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="Cluxo.Windows.App.Tests" />
+  </ItemGroup>
+
+</Project>
