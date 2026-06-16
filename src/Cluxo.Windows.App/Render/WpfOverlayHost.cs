@@ -1,6 +1,8 @@
 using System.Windows;
 using System.Windows.Threading;
+using Cluxo.Core;
 using Cluxo.Core.Platform;
+using Cluxo.Windows.App.Ui;
 
 namespace Cluxo.Windows.App.Render;
 
@@ -79,6 +81,19 @@ public sealed class WpfOverlayHost : IDisposable
     }
 
     public void StopRenderLoop() => _dispatcher.Invoke(() => _timer?.Stop());
+
+    private Window? _settingsWindow;
+
+    /// <summary>설정창을 WPF 스레드에서 띄운다(단일 인스턴스 — 이미 열려 있으면 앞으로).</summary>
+    public void ShowSettings(CursorSettings settings, ILaunchAtLogin launch)
+        => _dispatcher.Invoke(() =>
+        {
+            if (_settingsWindow is { IsVisible: true } w) { w.Activate(); return; }
+            _settingsWindow = new SettingsWindow(settings, launch);
+            _settingsWindow.Closed += (_, _) => _settingsWindow = null;
+            _settingsWindow.Show();
+            _settingsWindow.Activate();
+        });
 
     public void Dispose()
     {

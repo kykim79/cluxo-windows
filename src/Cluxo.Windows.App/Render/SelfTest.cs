@@ -93,6 +93,29 @@ internal static class SelfTest
         return 0;
     }
 
+    private sealed class StubLaunch : ILaunchAtLogin { public bool IsEnabled { get; set; } }
+
+    /// <summary>설정창 패널 렌더 → PNG (Window 부모 없이 BuildPanel을 흰 배경에 그린다).</summary>
+    public static int RunSettings()
+    {
+        var settings = new CursorSettings(new JsonSettingsStore());
+        var panel = Ui.SettingsWindow.BuildPanel(settings, new StubLaunch());
+        var border = new Border { Width = 440, Height = 560, Background = Brushes.White, Child = panel };
+        border.Measure(new Size(440, 560));
+        border.Arrange(new Rect(0, 0, 440, 560));
+        border.UpdateLayout();
+
+        var rtb = new RenderTargetBitmap(440, 560, 96, 96, PixelFormats.Pbgra32);
+        rtb.Render(border);
+
+        string png = Path.Combine(Path.GetTempPath(), "cluxo-selftest-settings.png");
+        var enc = new PngBitmapEncoder();
+        enc.Frames.Add(BitmapFrame.Create(rtb));
+        using (var fs = File.Create(png)) enc.Save(fs);
+        File.WriteAllText(Path.Combine(Path.GetTempPath(), "cluxo-selftest-settings.txt"), $"png={png}\n");
+        return 0;
+    }
+
     /// <summary>라디얼 메뉴(main + sub + subSub fan 라벨) 렌더 → PNG. Spotlight→반경→140pt 선택 경로.</summary>
     public static int RunRadial()
     {

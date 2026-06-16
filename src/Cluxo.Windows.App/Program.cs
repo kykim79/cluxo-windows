@@ -34,6 +34,11 @@ internal static class Program
             Environment.Exit(SelfTest.RunRadial());
             return;
         }
+        if (args.Length > 0 && args[0] == "--selftest-settings")
+        {
+            Environment.Exit(SelfTest.RunSettings());
+            return;
+        }
 
         // 입력·Shell·렌더 계층은 서로 독립(각자 전용 스레드) → 병렬 생성으로 스레드 기동·WPF init을 겹친다.
         // overlay의 clock 람다는 렌더 시점에만 호출되므로 shell이 그때 준비돼 있으면 된다.
@@ -59,7 +64,7 @@ internal static class Program
         {
             new TrayMenuItem("drawing", "그리기 모드", IsChecked: coordinator.IsDrawingModeActive),
             new TrayMenuItem("inspector", "좌표 표시", IsChecked: coordinator.IsInspectorActive),
-            new TrayMenuItem("startup", "로그인 시 실행", IsChecked: shell.LaunchAtLogin.IsEnabled),
+            new TrayMenuItem("settings", "설정...", IsSeparatorBefore: true),
             new TrayMenuItem("quit", "종료", IsSeparatorBefore: true),
         };
         shell.SetTrayMenuProvider(BuildMenu);
@@ -70,7 +75,7 @@ internal static class Program
             {
                 case "drawing": coordinator.ToggleDrawingMode(); break;
                 case "inspector": coordinator.ToggleInspector(); break;
-                case "startup": shell.LaunchAtLogin.IsEnabled = !shell.LaunchAtLogin.IsEnabled; break;
+                case "settings": overlay.ShowSettings(coordinator.Settings, shell.LaunchAtLogin); break;
                 case "quit": exit.Set(); break;
             }
         };

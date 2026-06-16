@@ -80,6 +80,9 @@ public sealed class OverlayCoordinator : IDisposable
     public bool IsRadialMenuActive { get { lock (_gate) return _runtime.IsRadialMenuActive; } }
     public bool IsSpotlightActive { get { lock (_gate) return _runtime.IsSpotlightActive; } }
 
+    /// <summary>라이브 설정 모델(설정창이 편집 → Changed로 즉시 적용·영구화). Start 후 유효.</summary>
+    public CursorSettings Settings => _settingsModel;
+
     public OverlayCoordinator(
         IMouseHook mouse, IKeyboardHook keyboard, IHotkeyRegistrar hotkeys,
         ICursorPositionSource cursor, IMonitorProvider monitors,
