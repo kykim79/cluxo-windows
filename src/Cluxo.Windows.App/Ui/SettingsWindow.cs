@@ -19,8 +19,9 @@ internal sealed class SettingsWindow : Window
     public SettingsWindow(CursorSettings settings, ILaunchAtLogin launch)
     {
         Title = "Cluxo 설정";
-        Width = 440;
-        Height = 620;
+        Width = 460;
+        Height = 640;
+        MinWidth = 380;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
         ResizeMode = ResizeMode.CanMinimize;
         ShowInTaskbar = true;
@@ -80,7 +81,8 @@ internal sealed class SettingsWindow : Window
         where T : struct, Enum
     {
         var values = Enum.GetValues<T>();
-        var combo = new ComboBox { Width = 200, HorizontalAlignment = HorizontalAlignment.Left };
+        // 가용 폭에 맞춰 늘어남(Stretch) — 고정 너비면 스크롤바 등장 시 잘림.
+        var combo = new ComboBox { HorizontalAlignment = HorizontalAlignment.Stretch };
         foreach (var v in values) combo.Items.Add(new ComboBoxItem { Content = labelOf(v), Tag = v });
         combo.SelectedIndex = Math.Max(0, Array.IndexOf(values, current));
         combo.SelectionChanged += (_, _) =>
@@ -93,34 +95,44 @@ internal sealed class SettingsWindow : Window
     private static FrameworkElement SliderRow(string label, double current, double min, double max, double tick,
         Action<double> onChange, Func<double, string> fmt)
     {
-        var valueText = new TextBlock { Width = 48, TextAlignment = TextAlignment.Right, VerticalAlignment = VerticalAlignment.Center };
+        var valueText = new TextBlock
+        {
+            Width = 40, TextAlignment = TextAlignment.Right, VerticalAlignment = VerticalAlignment.Center,
+        };
         var slider = new Slider
         {
-            Minimum = min, Maximum = max, Value = current, Width = 150,
-            TickFrequency = tick, IsSnapToTickEnabled = true, VerticalAlignment = VerticalAlignment.Center,
+            Minimum = min, Maximum = max, Value = current,
+            TickFrequency = tick, IsSnapToTickEnabled = true,
+            VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0),
         };
         valueText.Text = fmt(current);
         slider.ValueChanged += (_, e) => { valueText.Text = fmt(e.NewValue); onChange(e.NewValue); };
-        var sp = new StackPanel { Orientation = Orientation.Horizontal };
-        sp.Children.Add(slider);
-        sp.Children.Add(valueText);
-        return Row(label, sp);
+
+        // 슬라이더는 늘어나고, 값 텍스트는 고정 폭으로 우측 고정.
+        var inner = new Grid();
+        inner.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        inner.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        Grid.SetColumn(slider, 0);
+        Grid.SetColumn(valueText, 1);
+        inner.Children.Add(slider);
+        inner.Children.Add(valueText);
+        return Row(label, inner);
     }
 
     private static FrameworkElement CheckRow(string label, bool current, Action<bool> onChange)
     {
-        var chk = new CheckBox { IsChecked = current, VerticalAlignment = VerticalAlignment.Center };
+        var chk = new CheckBox { IsChecked = current, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Left };
         chk.Checked += (_, _) => onChange(true);
         chk.Unchecked += (_, _) => onChange(false);
         return Row(label, chk);
     }
 
-    private static FrameworkElement Row(string label, UIElement control)
+    private static FrameworkElement Row(string label, FrameworkElement control)
     {
-        var grid = new Grid { Margin = new Thickness(0, 5, 0, 5) };
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(170) });
+        var grid = new Grid { Margin = new Thickness(0, 5, 8, 5) }; // 우측 8px — 컨트롤이 스크롤바와 안 겹치게
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(150) });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        var lbl = new TextBlock { Text = label, VerticalAlignment = VerticalAlignment.Center };
+        var lbl = new TextBlock { Text = label, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
         Grid.SetColumn(lbl, 0);
         Grid.SetColumn(control, 1);
         grid.Children.Add(lbl);

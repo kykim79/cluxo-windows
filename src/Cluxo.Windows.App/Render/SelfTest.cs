@@ -148,13 +148,15 @@ internal static class SelfTest
     public static int RunSettings()
     {
         var settings = new CursorSettings(new JsonSettingsStore());
+        // 스크롤바가 뜬 실제 창의 가용 폭(≈ 460 client - 17 scrollbar)을 시뮬레이션 — 잘림 검증.
+        const double w = 425;
         var panel = Ui.SettingsWindow.BuildPanel(settings, new StubLaunch());
-        var border = new Border { Width = 440, Height = 720, Background = Brushes.White, Child = panel };
-        border.Measure(new Size(440, 720));
-        border.Arrange(new Rect(0, 0, 440, 720));
+        var border = new Border { Width = w, Height = 760, Background = Brushes.White, Child = panel };
+        border.Measure(new Size(w, 760));
+        border.Arrange(new Rect(0, 0, w, 760));
         border.UpdateLayout();
 
-        var rtb = new RenderTargetBitmap(440, 720, 96, 96, PixelFormats.Pbgra32);
+        var rtb = new RenderTargetBitmap((int)w, 760, 96, 96, PixelFormats.Pbgra32);
         rtb.Render(border);
 
         string png = Path.Combine(Path.GetTempPath(), "cluxo-selftest-settings.png");
