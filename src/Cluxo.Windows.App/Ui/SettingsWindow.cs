@@ -437,14 +437,15 @@ internal sealed class SettingsWindow : Window
 
     private static Border SwatchRing(Brush dotBg, string tip)
     {
+        // 7색 + 커스텀 = 8개가 한 줄에 들어가도록 컴팩트하게(약 8×32px).
         var dot = new Border
         {
-            Width = 24, Height = 24, CornerRadius = new CornerRadius(12), Background = dotBg,
+            Width = 20, Height = 20, CornerRadius = new CornerRadius(10), Background = dotBg,
             BorderBrush = SwatchHairline, BorderThickness = new Thickness(1), // 밝은 색(흰색) 가시성
         };
         return new Border
         {
-            Width = 34, Height = 34, CornerRadius = new CornerRadius(17), BorderThickness = new Thickness(2.5),
+            Width = 30, Height = 30, CornerRadius = new CornerRadius(15), BorderThickness = new Thickness(2.5),
             BorderBrush = Brushes.Transparent, Background = Brushes.Transparent, Child = dot,
             Margin = new Thickness(1), Cursor = Cursors.Hand, ToolTip = tip,
         };
