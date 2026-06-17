@@ -40,6 +40,8 @@
     <Content Include="Assets\cluxo.ico">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <!-- 비활성(꺼짐) 트레이 아이콘 — 단일파일 빌드에선 Assets가 디스크에 없으므로 어셈블리에 임베드 -->
+    <EmbeddedResource Include="Assets\cluxo-off.ico" />
   </ItemGroup>
 
   <!-- 입력 계층 순수 로직(internal)을 단위 테스트에 노출 -->

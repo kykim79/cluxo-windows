@@ -45,6 +45,9 @@ public interface ITrayIcon : IDisposable
 
     /// <summary>트레이 아이콘 좌클릭 — 맥처럼 활성/비활성 토글에 쓴다.</summary>
     event Action? IconClicked;
+
+    /// <summary>활성/비활성에 따라 트레이 아이콘(과 툴팁)을 바꾼다. false면 회색(꺼짐) 아이콘.</summary>
+    void SetActiveIcon(bool active);
 }
 
 /// <summary>포그라운드 앱 식별 — 발표/녹화 앱 감지에 사용.</summary>

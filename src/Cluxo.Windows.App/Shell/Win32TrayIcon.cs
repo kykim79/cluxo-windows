@@ -18,7 +18,9 @@ internal sealed class Win32TrayIcon : ITrayIcon
     private volatile IReadOnlyList<TrayMenuItem> _items = Array.Empty<TrayMenuItem>();
     private bool _added;
     private bool _disposed;
-    private IntPtr _icon; // 파일에서 로드한 아이콘(소유 → DestroyIcon)
+    private IntPtr _icon;    // 활성 아이콘(소유 → DestroyIcon)
+    private IntPtr _offIcon; // 비활성(회색) 아이콘(소유 → DestroyIcon)
+    private bool _active = true;
 
     public event Action<string>? ItemClicked;
     public event Action? IconClicked;
@@ -49,6 +51,57 @@ internal sealed class Win32TrayIcon : ITrayIcon
             szInfoTitle = "",
         };
         _added = SN.Shell_NotifyIcon(SN.NIM_ADD, ref nid);
+        _offIcon = LoadOffIcon(); // 비활성용 회색 아이콘 미리 준비
+    }
+
+    // 비활성(회색) 아이콘 — 단일파일 빌드는 Assets가 디스크에 없으니 임베드 리소스를 임시파일로 풀어 로드.
+    private IntPtr LoadOffIcon()
+    {
+        try
+        {
+            var path = System.IO.Path.Combine(AppContext.BaseDirectory, "Assets", "cluxo-off.ico");
+            if (!System.IO.File.Exists(path))
+            {
+                var asm = typeof(Win32TrayIcon).Assembly;
+                string? res = null;
+                foreach (var n in asm.GetManifestResourceNames())
+                    if (n.EndsWith("cluxo-off.ico", StringComparison.OrdinalIgnoreCase)) { res = n; break; }
+                if (res is not null)
+                {
+                    path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "cluxo-off.ico");
+                    using var s = asm.GetManifestResourceStream(res)!;
+                    using var fs = System.IO.File.Create(path);
+                    s.CopyTo(fs);
+                }
+            }
+            if (System.IO.File.Exists(path))
+            {
+                var h = SN.LoadImage(IntPtr.Zero, path, SN.IMAGE_ICON, 0, 0, SN.LR_LOADFROMFILE | SN.LR_DEFAULTSIZE);
+                if (h != IntPtr.Zero) return h;
+            }
+        }
+        catch { /* 폴백 */ }
+        return IntPtr.Zero; // 못 만들면 SetActiveIcon이 활성 아이콘으로 폴백
+    }
+
+    public void SetActiveIcon(bool active)
+    {
+        _active = active;
+        if (!_added) return;
+        _host.Post(() =>
+        {
+            var nid = new SN.NOTIFYICONDATA
+            {
+                cbSize = (uint)Marshal.SizeOf<SN.NOTIFYICONDATA>(),
+                hWnd = _host.Hwnd,
+                uID = TrayId,
+                uFlags = SN.NIF_ICON | SN.NIF_TIP,
+                hIcon = active || _offIcon == IntPtr.Zero ? _icon : _offIcon,
+                szTip = active ? _tooltip : _tooltip + " (비활성)",
+                szInfo = "", szInfoTitle = "",
+            };
+            SN.Shell_NotifyIcon(SN.NIM_MODIFY, ref nid);
+        });
     }
 
     // 트레이 아이콘 로드 순서: ① Assets\cluxo.ico(코브랜딩 교체 가능) → ② exe에 박힌 아이콘
@@ -177,5 +230,6 @@ internal sealed class Win32TrayIcon : ITrayIcon
             });
         }
         if (_icon != IntPtr.Zero) { SN.DestroyIcon(_icon); _icon = IntPtr.Zero; }
+        if (_offIcon != IntPtr.Zero) { SN.DestroyIcon(_offIcon); _offIcon = IntPtr.Zero; }
     }
 }

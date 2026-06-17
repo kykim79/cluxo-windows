@@ -56,7 +56,11 @@ internal static class Program
         }
         if (args.Length > 0 && args[0] == "--make-icon")
         {
-            Ui.IconMaker.Make(args.Length > 1 ? args[1] : System.IO.Path.Combine(System.IO.Path.GetTempPath(), "cluxo.ico"));
+            var icoPath = args.Length > 1 ? args[1] : System.IO.Path.Combine(System.IO.Path.GetTempPath(), "cluxo.ico");
+            Ui.IconMaker.Make(icoPath, inactive: false);
+            // 비활성(꺼짐) 변형도 같은 폴더에 cluxo-off.ico로 — 트레이가 비활성 시 교체해 쓴다.
+            var offPath = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(icoPath)!, "cluxo-off.ico");
+            Ui.IconMaker.Make(offPath, inactive: true);
             Environment.Exit(0);
             return;
         }
@@ -162,6 +166,8 @@ internal static class Program
         };
         // 트레이 아이콘 좌클릭 — 맥처럼 활성/비활성 토글.
         shell.Tray.IconClicked += coordinator.ToggleActive;
+        // 활성/비활성 시 트레이 아이콘(회색)·툴팁 교체.
+        coordinator.ActiveChanged += shell.Tray.SetActiveIcon;
 
         coordinator.Start();
         overlay.StartRenderLoop(

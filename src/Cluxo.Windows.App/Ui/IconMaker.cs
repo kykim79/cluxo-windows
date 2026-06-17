@@ -13,10 +13,10 @@ internal static class IconMaker
 {
     private static readonly int[] Sizes = { 16, 24, 32, 48, 64, 128, 256 };
 
-    public static void Make(string outPath)
+    public static void Make(string outPath, bool inactive = false)
     {
         var frames = new List<byte[]>();
-        foreach (var s in Sizes) frames.Add(RenderPng(s));
+        foreach (var s in Sizes) frames.Add(RenderPng(s, inactive));
 
         Directory.CreateDirectory(Path.GetDirectoryName(outPath)!);
         using var fs = File.Create(outPath);
@@ -44,30 +44,35 @@ internal static class IconMaker
         foreach (var f in frames) w.Write(f);
     }
 
-    private static byte[] RenderPng(int size)
+    private static byte[] RenderPng(int size, bool inactive)
     {
         double sz = size;
         double c = sz / 2.0;
 
+        // 활성: 검은 타일 + 노란 링 + 흰 점(맥). 비활성: 회색 톤(꺼짐 — 트레이에서 한눈에 구분).
+        var tile = inactive ? Color.FromRgb(0x2A, 0x2A, 0x2E) : Color.FromRgb(0x0D, 0x0D, 0x0F);
+        var ringColor = inactive ? Color.FromRgb(0x6E, 0x6E, 0x74) : Color.FromRgb(255, 204, 0);
+        var dotColor = inactive ? Color.FromRgb(0x9A, 0x9A, 0xA0) : Colors.White;
+
         var dv = new DrawingVisual();
         using (var dc = dv.RenderOpen())
         {
-            // 배경 타일 — 검은 둥근 사각형(맥 아이콘과 동일). 꽉 찬 어두운 실루엣이라 어디서나 또렷.
+            // 배경 타일 — 둥근 사각형. 꽉 찬 실루엣이라 어디서나 또렷.
             double pad = Math.Max(0.5, sz * 0.055);
             var rect = new Rect(pad, pad, sz - 2 * pad, sz - 2 * pad);
             double corner = (sz - 2 * pad) * 0.27;
-            var bg = new SolidColorBrush(Color.FromRgb(0x0D, 0x0D, 0x0F)); bg.Freeze();
+            var bg = new SolidColorBrush(tile); bg.Freeze();
             dc.DrawRoundedRectangle(bg, null, rect, corner, corner);
 
-            // 노란(시스템 yellow) 커서 링 + 흰 중심 점 — 맥 아이콘과 동일.
+            // 커서 링 + 중심 점.
             double r = sz * 0.27;
             double t = Math.Max(1.6, sz * 0.11);
-            var yellow = new SolidColorBrush(Color.FromRgb(255, 204, 0)); yellow.Freeze();
-            var pen = new Pen(yellow, t) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round };
+            var ring = new SolidColorBrush(ringColor); ring.Freeze();
+            var pen = new Pen(ring, t) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round };
             pen.Freeze();
             dc.DrawEllipse(null, pen, new Point(c, c), r, r);
-            var white = new SolidColorBrush(Colors.White); white.Freeze();
-            dc.DrawEllipse(white, null, new Point(c, c), Math.Max(1.0, sz * 0.06), Math.Max(1.0, sz * 0.06));
+            var dot = new SolidColorBrush(dotColor); dot.Freeze();
+            dc.DrawEllipse(dot, null, new Point(c, c), Math.Max(1.0, sz * 0.06), Math.Max(1.0, sz * 0.06));
         }
 
         var rtb = new RenderTargetBitmap(size, size, 96, 96, PixelFormats.Pbgra32);
