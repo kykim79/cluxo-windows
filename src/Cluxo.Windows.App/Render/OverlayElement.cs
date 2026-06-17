@@ -99,9 +99,33 @@ internal sealed class OverlayElement : FrameworkElement
         DrawRadial(dc, f, accent);
 
         DrawInspector(dc, f, accent);
+        DrawDrawingMode(dc, f);
         DrawToolbar(dc, f);
         DrawKeystroke(dc, f);
         DrawBranding(dc, f);
+    }
+
+    // 그리기 모드 표시 — 화면 가장자리 강조 테두리 + 상단 중앙 라벨. 활성화를 확실히 인지하게.
+    private void DrawDrawingMode(DrawingContext dc, OverlayFrame f)
+    {
+        if (f.Toolbar is not { } tb) return; // 툴바 있는 모니터(=커서 모니터)에만
+        double s = _monitor.DpiScale <= 0 ? 1.0 : _monitor.DpiScale;
+        double w = _monitor.Bounds.Width / s, h = _monitor.Bounds.Height / s; // 모니터 로컬 크기(DIP)
+        if (w <= 1 || h <= 1) return;
+
+        const double inset = 3;
+        var pen = new Pen(MakeBrush(tb.Accent, 0.5), 4) { LineJoin = PenLineJoin.Round };
+        dc.DrawRectangle(null, pen, new Rect(inset, inset, w - inset * 2, h - inset * 2));
+
+        // 상단 중앙 라벨 pill
+        var ppd = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+        var ft = new FormattedText("✏  그리기 모드", CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
+            new Typeface("Segoe UI"), 13, MakeBrush(Rgba.FromWhite(0.95), 1.0), ppd);
+        double padX = 14, padY = 5;
+        double pw = ft.Width + padX * 2, ph = ft.Height + padY * 2;
+        double px = (w - pw) / 2, py = 12;
+        dc.DrawRoundedRectangle(MakeBrush(tb.Accent, 0.85), null, new Rect(px, py, pw, ph), ph / 2, ph / 2);
+        dc.DrawText(ft, new Point(px + padX, py + padY));
     }
 
     private void PruneFirstSeen(OverlayEffects fx)
