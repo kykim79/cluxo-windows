@@ -65,6 +65,8 @@ internal sealed class MagnifierWindow : IDisposable
     private IntPtr _host, _mag;
     private bool _ok, _visible;
     private int _lastW, _lastH;
+    private double _lastZoom = -1;
+    private IntPtr[] _lastExclude = Array.Empty<IntPtr>();
 
     public MagnifierWindow()
     {
@@ -114,21 +116,39 @@ internal sealed class MagnifierWindow : IDisposable
             _lastW = _lastH = lens;
         }
 
-        // 우리 오버레이 창 + 호스트 자신을 확대 대상에서 제외(재귀 방지).
+        // 우리 오버레이 창 + 호스트 자신을 확대 대상에서 제외(재귀 방지). 매 프레임 호출은 끊김 유발 →
+        // 목록이 바뀔 때만 갱신(보통 모니터 구성 변경 시뿐).
         var list = new IntPtr[exclude.Length + 1];
         Array.Copy(exclude, list, exclude.Length);
         list[^1] = _host;
-        MagSetWindowFilterList(_mag, MW_FILTERMODE_EXCLUDE, list.Length, list);
+        if (!ExcludeEqual(list))
+        {
+            MagSetWindowFilterList(_mag, MW_FILTERMODE_EXCLUDE, list.Length, list);
+            _lastExclude = list;
+        }
 
+        // 배율 변환도 바뀔 때만(매 프레임 SetTransform 회피).
+        if (zoom != _lastZoom)
+        {
+            float z = (float)zoom;
+            var t = new MAGTRANSFORM { m00 = z, m11 = z, m22 = 1f };
+            MagSetWindowTransform(_mag, ref t);
+            _lastZoom = zoom;
+        }
+
+        // 소스(커서 추적)는 매 프레임 갱신 — 이게 콘텐츠 리프레시.
         int half = (int)Math.Round(lens / (2.0 * zoom));
         var src = new RECT { left = cx - half, top = cy - half, right = cx + half, bottom = cy + half };
         MagSetWindowSource(_mag, src);
 
-        float z = (float)zoom;
-        var t = new MAGTRANSFORM { m00 = z, m11 = z, m22 = 1f };
-        MagSetWindowTransform(_mag, ref t);
-
         if (!_visible) { ShowWindow(_host, SW_SHOWNOACTIVATE); _visible = true; }
+    }
+
+    private bool ExcludeEqual(IntPtr[] list)
+    {
+        if (list.Length != _lastExclude.Length) return false;
+        for (int i = 0; i < list.Length; i++) if (list[i] != _lastExclude[i]) return false;
+        return true;
     }
 
     public void Hide()

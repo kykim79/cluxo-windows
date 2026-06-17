@@ -104,6 +104,18 @@ internal sealed class OverlayElement : FrameworkElement
         DrawToolbar(dc, f);
         DrawKeystroke(dc, f);
         DrawBranding(dc, f);
+        DrawMagnifierBorder(dc, f);  // 렌즈 가장자리 링(Magnification 창 바로 바깥)
+    }
+
+    // ── 돋보기 렌즈 테두리 — Magnification 창(반경 r) 바로 바깥에 링을 그린다(확대 대상서 제외돼 재귀 없음) ──
+    private void DrawMagnifierBorder(DrawingContext dc, OverlayFrame f)
+    {
+        if (f.MagnifierLens is not { } lens || f.CursorPosition is not { } cursor) return;
+        var c = ToLocal(cursor);
+        double r = lens / 2;
+        var color = f.Ring?.Color ?? new Rgba(0, 230, 255);
+        dc.DrawEllipse(null, new Pen(MakeBrush(Rgba.FromWhite(0.3), 1.0), 6), c, r + 3, r + 3); // 옅은 그림자 링
+        dc.DrawEllipse(null, new Pen(MakeBrush(color, 0.95), 2.5), c, r + 2, r + 2);             // accent 테두리
     }
 
     // 그리기 모드 표시 — 화면 가장자리 강조 테두리 + 상단 중앙 라벨. 활성화를 확실히 인지하게.

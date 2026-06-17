@@ -121,7 +121,8 @@ public sealed class OverlayCoordinator : IDisposable
         {
             lock (_gate)
             {
-                if (!_runtime.IsMagnifierActive) return null;
+                // 라디얼/그리기 중엔 렌즈를 숨겨(topmost 창이 메뉴를 덮지 않게).
+                if (!_runtime.IsMagnifierActive || _runtime.IsRadialMenuActive || _drawing.IsDrawingModeActive) return null;
                 var pos = _runtime.CursorPosition;
                 double dpi = MonitorContaining(pos)?.DpiScale ?? 1.0;
                 return new MagnifierState(pos, _magnifierZoom, _magnifierSize * dpi);
@@ -293,6 +294,8 @@ public sealed class OverlayCoordinator : IDisposable
         SpotlightVisual? spotlight = _runtime.IsSpotlightActive
             ? new SpotlightVisual(_spotlightRadius, _spotlightSoftness)
             : null;
+        // 돋보기 — 라디얼/그리기 중엔 메뉴를 가리지 않게 숨긴다(렌즈 창이 topmost라 메뉴를 덮음).
+        bool magnifierOn = _runtime.IsMagnifierActive && !_runtime.IsRadialMenuActive && !_drawing.IsDrawingModeActive;
 
         // 그리기 툴바 — 활성 시 커서 모니터(없으면 첫 모니터) 하단 중앙에 1회 레이아웃.
         // DrawingState 프레임(히트테스트)과 ToolbarVisual(렌더)을 동시에 채운다.
@@ -348,7 +351,8 @@ public sealed class OverlayCoordinator : IDisposable
                     radialValues, radialSubActive, radialSubSubActive)
                 : null;
             result.Add((renderer, new OverlayFrame(monitor.Id, cursorHere, ring, shapes, branding, effects, keystroke, drag, radial,
-                _runtime.IsInspectorActive, toolbarHere, _ringShape, spotlight)));
+                _runtime.IsInspectorActive, toolbarHere, _ringShape, spotlight,
+                magnifierOn && cursorHere is not null ? _magnifierSize : (double?)null)));
         }
         return result;
     }
