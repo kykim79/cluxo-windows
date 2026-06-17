@@ -63,8 +63,8 @@ public sealed class CursorSettings
     public string HotkeyMagnifier { get => Get("hotkey.magnifier", "M"); set => Set("hotkey.magnifier", value); }
     public string HotkeyKeystroke { get => Get("hotkey.keystroke", "K"); set => Set("hotkey.keystroke", value); }
 
-    /// <summary>업데이트 매니페스트 URL(직접 배포용). 비면 업데이트 확인 비활성. 코브랜딩/배포 시 설정.</summary>
-    public string UpdateManifestUrl { get => Get("update.manifestUrl", ""); set => Set("update.manifestUrl", value); }
+    /// <summary>업데이트 소스 — GitHub "owner/repo"(releases/latest) 또는 매니페스트 JSON URL. 비면 확인 비활성.</summary>
+    public string UpdateManifestUrl { get => Get("update.manifestUrl", "kykim79/cluxo-windows"); set => Set("update.manifestUrl", value); }
 
     // ── 그리기 toolbar 위치 ──────────────────────────────────────
     public double DrawingToolbarLeading { get => Get("drawingToolbarLeading", 28.0); set => Set("drawingToolbarLeading", value); }

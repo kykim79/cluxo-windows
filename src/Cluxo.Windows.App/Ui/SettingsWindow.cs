@@ -218,7 +218,7 @@ internal sealed class SettingsWindow : Window
         content.Children.Add(new Border { Height = 1, Background = DividerBrush, Margin = new Thickness(-14, 0, -14, 8) });
 
         // 업데이트 매니페스트 URL — 배포/코브랜딩 시 미리 채우거나, 여기서 직접 입력.
-        content.Children.Add(new TextBlock { Text = "업데이트 URL (매니페스트 JSON)", Foreground = TextMuted, FontSize = 11, Margin = new Thickness(0, 0, 0, 4) });
+        content.Children.Add(new TextBlock { Text = "업데이트 소스 (GitHub owner/repo 또는 매니페스트 URL)", Foreground = TextMuted, FontSize = 11, Margin = new Thickness(0, 0, 0, 4) });
         var urlBox = new TextBox
         {
             Text = s.UpdateManifestUrl, FontSize = 12, Foreground = TextPrimary,
