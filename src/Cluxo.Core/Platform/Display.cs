@@ -53,7 +53,8 @@ public readonly record struct ToolbarVisual(
     RectD Bounds, Rgba Accent, string Hint,
     IReadOnlyList<ToolbarItem> Tools,
     IReadOnlyList<ToolbarItem> Thickness,
-    IReadOnlyList<ToolbarItem> Colors);
+    IReadOnlyList<ToolbarItem> Colors,
+    RectD Close);
 
 /// <summary>한 모니터의 일시적 효과 스냅샷 (해당 모니터 영역 효과만 필터됨).</summary>
 public readonly record struct OverlayEffects(

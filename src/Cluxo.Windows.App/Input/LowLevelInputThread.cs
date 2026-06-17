@@ -231,11 +231,11 @@ internal sealed class LowLevelInputThread : IDisposable
                 var mods = _modifiers.Current;
                 RawKeyDiag?.Invoke(ev.Vk, ev.KeyDown, mods);
 
-                // 라디얼 chord(⌃⌥,) 전이는 down/up 모두로 판정
+                // 라디얼 토글 chord(⌃⌥.) — chord 완성(누름) 전이에서 토글 신호. (콤마는 Terminal 충돌로 마침표)
                 switch (_radial.OnKey(ev.Vk, ev.KeyDown, mods))
                 {
-                    case ChordEdge.Opened: RadialOpened?.Invoke(); break;
-                    case ChordEdge.Closed: RadialClosed?.Invoke(); break;
+                    case ChordEdge.Opened: RadialOpened?.Invoke(); break; // 코디네이터가 ToggleRadial로 처리
+                    case ChordEdge.Closed: RadialClosed?.Invoke(); break; // 떼임 — 토글 모델이라 사용 안 함(facade 호환)
                 }
 
                 // 키스트로크 오버레이는 down에서만 표시(게이트는 Core KeyFormat이 처리)

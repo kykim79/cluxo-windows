@@ -99,18 +99,18 @@ internal static class SelfTest
     /// <summary>그리기 툴바 렌더 → PNG. ToolbarVisual을 직접 구성해 패널·도구·두께·색을 검증.</summary>
     public static int RunToolbar()
     {
-        const int w = 720, h = 140;
+        const int w = 800, h = 140;
         var accent = new Rgba(0, 230, 255);
         var tools = new[] { DrawingTool.Pen, DrawingTool.Line, DrawingTool.Arrow, DrawingTool.Rectangle,
             DrawingTool.Ellipse, DrawingTool.Highlighter, DrawingTool.Badge };
-        const double toolD = 34, toolGap = 7, thickHit = 22, thickGap = 4, colorHit = 22, colorGap = 4, groupGap = 18, pad = 14;
+        const double toolD = 34, toolGap = 7, thickHit = 22, thickGap = 4, colorHit = 22, colorGap = 4, groupGap = 18, closeD = 30, pad = 14;
         var steps = new double[] { 2, 4, 6, 10, 14 };
         var colors = new[] { RingColor.Yellow, RingColor.Red, RingColor.Blue, RingColor.Green, RingColor.Cyan, RingColor.Purple, RingColor.White };
 
         double toolsW = tools.Length * toolD + (tools.Length - 1) * toolGap;
         double thickW = steps.Length * thickHit + (steps.Length - 1) * thickGap;
         double colorW = colors.Length * colorHit + (colors.Length - 1) * colorGap;
-        double panelW = toolsW + groupGap + thickW + groupGap + colorW + pad * 2;
+        double panelW = toolsW + groupGap + thickW + groupGap + colorW + groupGap + closeD + pad * 2;
         double panelH = toolD + pad * 2;
         double left = (w - panelW) / 2, top = (h - panelH) / 2 + 8, cy = top + panelH / 2, x = left + pad;
 
@@ -134,8 +134,10 @@ internal static class SelfTest
             colorItems.Add(new ToolbarItem(new RectD(x, cy - colorHit / 2, colorHit, colorHit), c == RingColor.Cyan, c == RingColor.Cyan, c.Color(), 0, default));
             x += colorHit + colorGap;
         }
+        x += groupGap - colorGap;
+        var close = new RectD(x, cy - 15, 30, 30);
         var tb = new ToolbarVisual(new RectD(left, top, panelW, panelH), accent,
-            "화살표 · 드래그하여 그리기 · ESC 종료", toolItems, thickItems, colorItems);
+            "화살표 · 드래그하여 그리기 · ESC 종료", toolItems, thickItems, colorItems, close);
 
         var mon = new MonitorInfo("M", new RectD(0, 0, w, h), 1.0, true);
         var el = new OverlayElement(mon, () => 0.0) { Width = w, Height = h };

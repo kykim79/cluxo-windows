@@ -295,6 +295,19 @@ internal sealed class OverlayElement : FrameworkElement
             if (it.Selected) dc.DrawEllipse(null, new Pen(MakeBrush(Rgba.FromWhite(0.95), 1.0), 2.0), ctr, 10, 10);
         }
 
+        // 종료(✕) 버튼 — 빨강 배경 원 + 흰 ✕. 마우스로 그리기 종료.
+        if (tb.Close.Width > 0)
+        {
+            var rc = ToLocalRect(tb.Close);
+            var ctr = new Point(rc.X + rc.Width / 2, rc.Y + rc.Height / 2);
+            double rad = rc.Width / 2;
+            dc.DrawEllipse(MakeBrush(new Rgba(255, 77, 77), 0.9), null, ctr, rad, rad);
+            double k = rad * 0.42;
+            var xp = new Pen(MakeBrush(Rgba.FromWhite(0.98), 1.0), 2.0) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round };
+            dc.DrawLine(xp, new Point(ctr.X - k, ctr.Y - k), new Point(ctr.X + k, ctr.Y + k));
+            dc.DrawLine(xp, new Point(ctr.X - k, ctr.Y + k), new Point(ctr.X + k, ctr.Y - k));
+        }
+
         // 힌트 — 패널 위 중앙에 현재 도구/조작 안내.
         var ppd = VisualTreeHelper.GetDpi(this).PixelsPerDip;
         var ft = new FormattedText(tb.Hint, CultureInfo.CurrentCulture, FlowDirection.LeftToRight,

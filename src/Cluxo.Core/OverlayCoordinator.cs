@@ -145,6 +145,7 @@ public sealed class OverlayCoordinator : IDisposable
         TryRegisterHotkey("K", ToggleKeystroke);     // 키 입력 표시
         TryRegisterHotkey("C", CycleColor);          // 링 색 순환
         TryRegisterHotkey("H", CycleRingShape);      // 링 모양 순환
+        // ⌃⌥. 라디얼 토글은 RadialChordDetector(LL 후킹)가 처리 — RegisterHotKey 미사용.
         // ⌃⌥1~7 → 색 직접 지정 (맥과 동일 순서: 노랑/빨강/파랑/초록/하늘/보라/흰).
         for (int n = 0; n < ColorPalette.Length && n < 7; n++)
         {
@@ -158,8 +159,8 @@ public sealed class OverlayCoordinator : IDisposable
         _mouse.HookRemoved += OnHookRemoved;
         _keyboard.KeyPressed += OnKeyPressed;
         _foreground.Changed += OnForegroundChanged;
-        _radialTrigger.Opened += OnRadialOpened;
-        _radialTrigger.Closed += OnRadialClosed;
+        // ⌃⌥. chord 완성(Opened 전이)마다 라디얼 토글. Closed(떼임)는 토글 모델이라 사용 안 함.
+        _radialTrigger.Opened += ToggleRadial;
         _monitors.MonitorsChanged += RebuildRenderers;
 
         RebuildRenderers();
@@ -342,6 +343,8 @@ public sealed class OverlayCoordinator : IDisposable
         return result;
     }
 
+    private RectD _toolbarCloseRect; // 그리기 툴바 종료(✕) 버튼 — BuildToolbar에서 갱신, OnButtonDown에서 히트테스트.
+
     // 도구 표시 순서 (맥 DrawingToolbarView와 동일): 펜·직선·화살표·사각형·타원·형광펜·뱃지.
     private static readonly DrawingTool[] ToolbarOrder =
     {
@@ -354,14 +357,14 @@ public sealed class OverlayCoordinator : IDisposable
     private ToolbarVisual BuildToolbar(MonitorInfo mon)
     {
         const double pad = 14, toolD = 34, toolGap = 7, thickHit = 22, thickGap = 4,
-                     colorHit = 22, colorGap = 4, groupGap = 18, bottomMargin = 110;
+                     colorHit = 22, colorGap = 4, groupGap = 18, closeD = 30, bottomMargin = 110;
         var steps = Tokens.Drawing.LineWidthSteps;
         var colors = ColorPalette;
 
         double toolsW = ToolbarOrder.Length * toolD + (ToolbarOrder.Length - 1) * toolGap;
         double thickW = steps.Length * thickHit + (steps.Length - 1) * thickGap;
         double colorW = colors.Length * colorHit + (colors.Length - 1) * colorGap;
-        double panelW = toolsW + groupGap + thickW + groupGap + colorW + pad * 2;
+        double panelW = toolsW + groupGap + thickW + groupGap + colorW + groupGap + closeD + pad * 2;
         double panelH = toolD + pad * 2;
 
         double left = mon.Bounds.X + (mon.Bounds.Width - panelW) / 2;
@@ -405,9 +408,13 @@ public sealed class OverlayCoordinator : IDisposable
             colorItems.Add(new ToolbarItem(rect, sel, sel, c.Color(), 0, default));
             x += colorHit + colorGap;
         }
+        x += groupGap - colorGap;
+
+        // 종료 버튼 — 마우스로 그리기 모드를 끌 수 있게(클릭 흡수 중에도 툴바는 처리됨).
+        _toolbarCloseRect = new RectD(x, cy - closeD / 2, closeD, closeD);
 
         string hint = $"{preview.DisplayName()} · 드래그하여 그리기 · ESC 종료";
-        return new ToolbarVisual(bounds, _activeColor, hint, toolItems, thickItems, colorItems);
+        return new ToolbarVisual(bounds, _activeColor, hint, toolItems, thickItems, colorItems, _toolbarCloseRect);
     }
 
     // 커밋된 도형 + (그리기 중이면) 진행 중 stroke를 불변 스냅샷으로. 진행 중 stroke를 포함해
@@ -547,6 +554,13 @@ public sealed class OverlayCoordinator : IDisposable
             {
                 if (button == MouseButton.Left)
                 {
+                    // 종료(✕) 버튼이면 그리기 모드 끄기(도형 유지). 마우스만으로도 빠져나갈 수 있게.
+                    if (_toolbarCloseRect.Contains(point))
+                    {
+                        _drawing.ToggleMode(); // 활성 → OFF, 진행 중 stroke 정리
+                        _keystrokes.ShowStatusNotification("그리기 모드 OFF", now);
+                        return;
+                    }
                     // 툴바 클릭이면 도구/두께/색 선택만(도형 시작 안 함). 그 외 영역은 그리기 시작.
                     if (_drawing.HitToolbarAndSelect(point))
                         _keystrokes.ShowStatusNotification($"도구 · {_drawing.SelectedTool.DisplayName()}", now);
@@ -600,18 +614,6 @@ public sealed class OverlayCoordinator : IDisposable
                 _runtime.EndDrag();
             }
         }
-    }
-
-    private void OnRadialOpened()
-    {
-        PointD pos = _cursor.GetCursorPosition();
-        double now = _clock.NowSeconds;
-        lock (_gate) _radial.Open(pos, now);
-    }
-
-    private void OnRadialClosed()
-    {
-        lock (_gate) _radial.Close(); // 선택 액션 실행(설정/런타임 변경)
     }
 
     /// <summary>좌표(inspector) 토글 (⌃⌥I 핫키 + 트레이 메뉴 공용).</summary>
@@ -683,6 +685,28 @@ public sealed class OverlayCoordinator : IDisposable
         {
             _settingsModel.RingColor = color;
             _keystrokes.ShowStatusNotification($"링 색 · {color.Label()}", now);
+        }
+    }
+
+    /// <summary>라디얼 메뉴 토글 (⌃⌥.) — 닫혀 있으면 커서 위치에 열고 유지, 열려 있으면 실행 없이 닫는다.
+    /// 가운데 버튼과 동일한 유지 모델: 좌클릭으로 탐색·선택, 중앙 ✕/다시 ⌃⌥.로 닫기.</summary>
+    public void ToggleRadial()
+    {
+        lock (_gate)
+        {
+            if (_drawing.IsDrawingModeActive) return; // 그리기 중엔 무시
+            if (_runtime.IsRadialMenuActive)
+            {
+                _radial.Cancel(); // 키 토글 닫기 = 실행 없이 취소
+                _radialByMiddle = false;
+            }
+            else
+            {
+                var pos = _cursor.GetCursorPosition();
+                _radial.Open(pos, _clock.NowSeconds);
+                _runtime.IsRadialMenuVisible = true;
+                _radialByMiddle = true; // 가운데/좌클릭 커밋 경로 공유
+            }
         }
     }
 
@@ -811,8 +835,7 @@ public sealed class OverlayCoordinator : IDisposable
         _mouse.HookRemoved -= OnHookRemoved;
         _keyboard.KeyPressed -= OnKeyPressed;
         _foreground.Changed -= OnForegroundChanged;
-        _radialTrigger.Opened -= OnRadialOpened;
-        _radialTrigger.Closed -= OnRadialClosed;
+        _radialTrigger.Opened -= ToggleRadial;
         _monitors.MonitorsChanged -= RebuildRenderers;
 
         foreach (var reg in _hotkeyRegs) reg.Dispose();

@@ -84,6 +84,17 @@ public sealed class RadialMenuController
         return true;
     }
 
+    /// <summary>실행 없이 닫기 — 키 토글 닫기/ESC. (맥 cancelRadialMenuIfActive 대응)</summary>
+    public void Cancel()
+    {
+        if (!_runtime.IsRadialMenuActive) return;
+        _runtime.IsRadialMenuActive = false;
+        _runtime.IsRadialMenuVisible = false;
+        _runtime.RadialMenuSelectedSector = null;
+        _runtime.RadialMenuSelectedSubItem = null;
+        _runtime.RadialMenuSelectedSubSubItem = null;
+    }
+
     /// <summary>chord 떼임 — 현재 선택 액션 실행(dead zone/바깥이면 취소) 후 닫기.</summary>
     public void Close()
     {

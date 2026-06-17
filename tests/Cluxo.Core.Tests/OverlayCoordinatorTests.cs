@@ -712,17 +712,18 @@ public class OverlayCoordinatorTests
     }
 
     [Fact]
-    public void Radial_Close_ExecutesSelection()
+    public void Radial_ToggleAgain_ClosesWithoutExecuting()
     {
+        // ⌃⌥. 토글 모델 — 다시 누르면 실행 없이 취소(닫기). 실행은 좌/가운데 클릭으로.
         var h = new Harness();
         h.Coordinator.Start();
         h.Cursor.Position = new PointD(0, 0);
-        h.Radial.Open();
+        h.Radial.Open();                    // ⌃⌥. → 토글 ON
         h.Cursor.Position = new PointD(0, -80); h.Clock.NowSeconds = 0.2;
         h.Coordinator.RenderFrame();        // sector 0 (Spotlight) 메인 선택
-        h.Radial.Close();                   // 실행 → 스포트라이트 토글
-        Assert.True(h.Coordinator.IsSpotlightActive);
+        h.Radial.Open();                    // 다시 ⌃⌥. → 토글 OFF (취소)
         Assert.False(h.Coordinator.IsRadialMenuActive); // 닫힘
+        Assert.False(h.Coordinator.IsSpotlightActive);  // 실행 안 됨
     }
 
     [Fact]
