@@ -2,6 +2,17 @@
 <assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1">
   <assemblyIdentity version="1.0.0.0" name="Cluxo.Windows.App"/>
 
+  <!-- 관리자 권한 요청 — 관리자 권한 창(예: elevated 터미널) 위에서도 입력 후킹(가운데 버튼 라디얼·클릭
+       효과 등)이 동작하도록. UIPI: 일반 권한 프로세스는 더 높은 권한 창에 후킹할 수 없다. 실행 시 UAC.
+       (추후 uiAccess=true + 코드서명 + Program Files 설치로 UAC 없이 가능.) -->
+  <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
+    <security>
+      <requestedPrivileges>
+        <requestedExecutionLevel level="requireAdministrator" uiAccess="false"/>
+      </requestedPrivileges>
+    </security>
+  </trustInfo>
+
   <!-- Per-Monitor DPI v2 — 멀티모니터 좌표/링 크기 정합의 전제(OVERLAY-RENDER.md §4).
        GetCursorPos가 물리 픽셀을 주고, 모니터별 DpiScale로 로컬 DIP 변환한다. -->
   <application xmlns="urn:schemas-microsoft-com:asm.v3">
