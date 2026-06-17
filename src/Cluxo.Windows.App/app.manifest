@@ -2,13 +2,14 @@
 <assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1">
   <assemblyIdentity version="1.0.0.0" name="Cluxo.Windows.App"/>
 
-  <!-- 관리자 권한 요청 — 관리자 권한 창(예: elevated 터미널) 위에서도 입력 후킹(가운데 버튼 라디얼·클릭
-       효과 등)이 동작하도록. UIPI: 일반 권한 프로세스는 더 높은 권한 창에 후킹할 수 없다. 실행 시 UAC.
-       (추후 uiAccess=true + 코드서명 + Program Files 설치로 UAC 없이 가능.) -->
+  <!-- asInvoker(일반 권한) — 관리자로 올리면(requireAdministrator) UIPI 때문에 권한 없는 경로로 들어오는
+       키 입력을 못 받아 전역 단축키·후킹이 막힌다(원격/주입 입력 환경). 발표 도구엔 단축키가 핵심이라
+       일반 권한으로 둔다. 단, 관리자 창(elevated 터미널) 위 후킹은 안 됨 — 그건 uiAccess=true + 코드서명 +
+       Program Files 설치로만 UAC 없이 해결 가능(추후). -->
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
     <security>
       <requestedPrivileges>
-        <requestedExecutionLevel level="requireAdministrator" uiAccess="false"/>
+        <requestedExecutionLevel level="asInvoker" uiAccess="false"/>
       </requestedPrivileges>
     </security>
   </trustInfo>

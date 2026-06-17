@@ -141,8 +141,9 @@ public sealed class OverlayCoordinator : IDisposable
         {
             lock (_gate)
             {
-                // 라디얼/그리기 중엔 렌즈를 숨겨(topmost 창이 메뉴를 덮지 않게).
-                if (!_active || !_runtime.IsMagnifierActive || _runtime.IsRadialMenuActive || _drawing.IsDrawingModeActive) return null;
+                // 라디얼 중에도 렌즈를 보여 토글이 즉시 반영되게 한다(렌즈는 커서 중앙, 라디얼 링은 그 바깥).
+                // 그리기 중엔 숨김(주석 전용 모드).
+                if (!_active || !_runtime.IsMagnifierActive || _drawing.IsDrawingModeActive) return null;
                 var pos = _runtime.CursorPosition;
                 double dpi = MonitorContaining(pos)?.DpiScale ?? 1.0;
                 return new MagnifierState(pos, _magnifierZoom, _magnifierSize * dpi, _activeColor);
