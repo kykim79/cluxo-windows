@@ -50,7 +50,8 @@ internal sealed class Win32TrayIcon : ITrayIcon
         _added = SN.Shell_NotifyIcon(SN.NIM_ADD, ref nid);
     }
 
-    // 앱 아이콘을 파일에서 로드(코브랜딩 시 회사 .ico로 교체 가능). 실패 시 시스템 기본.
+    // 트레이 아이콘 로드 순서: ① Assets\cluxo.ico(코브랜딩 교체 가능) → ② exe에 박힌 아이콘
+    // (단일파일 빌드는 Assets가 디스크에 없으므로) → ③ 시스템 기본.
     private IntPtr LoadTrayIcon()
     {
         try
@@ -59,6 +60,16 @@ internal sealed class Win32TrayIcon : ITrayIcon
             if (System.IO.File.Exists(path))
             {
                 _icon = SN.LoadImage(IntPtr.Zero, path, SN.IMAGE_ICON, 0, 0, SN.LR_LOADFROMFILE | SN.LR_DEFAULTSIZE);
+                if (_icon != IntPtr.Zero) return _icon;
+            }
+
+            // exe에 임베드된 아이콘(ApplicationIcon) — 단일파일 배포에서 항상 동작.
+            var exe = Environment.ProcessPath;
+            if (!string.IsNullOrEmpty(exe) && SN.ExtractIconEx(exe, 0, out var large, out var small, 1) > 0)
+            {
+                _icon = small != IntPtr.Zero ? small : large;
+                var other = small != IntPtr.Zero ? large : IntPtr.Zero;
+                if (other != IntPtr.Zero) SN.DestroyIcon(other); // 안 쓰는 핸들 정리
                 if (_icon != IntPtr.Zero) return _icon;
             }
         }

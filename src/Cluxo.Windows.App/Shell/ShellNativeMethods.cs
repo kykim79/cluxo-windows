@@ -104,6 +104,10 @@ internal static class ShellNativeMethods
     [DllImport("user32.dll")]
     public static extern bool DestroyIcon(IntPtr hIcon);
 
+    // exe 등에 박힌 아이콘 추출 — 단일파일 빌드에서 Assets\cluxo.ico가 디스크에 없을 때 트레이용.
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+    public static extern uint ExtractIconEx(string lpszFile, int nIconIndex, out IntPtr phiconLarge, out IntPtr phiconSmall, uint nIcons);
+
     // ── 팝업 메뉴 ───────────────────────────────────────────────
     public const uint MF_STRING = 0x0000, MF_GRAYED = 0x0001, MF_DISABLED = 0x0002,
                       MF_CHECKED = 0x0008, MF_SEPARATOR = 0x0800;

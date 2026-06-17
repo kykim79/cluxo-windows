@@ -49,15 +49,27 @@ jobs:
           pwsh scripts/sign.ps1 -File publish/win-x64/Cluxo.Windows.App.exe -PfxPath "$env:RUNNER_TEMP/cert.pfx" -PfxPassword $env:PFX_PW
           Remove-Item "$env:RUNNER_TEMP/cert.pfx" -Force
 
-      - name: 버전명으로 산출물 이름 변경
+      - name: 포터블 exe 이름 변경(버전 포함)
+        shell: pwsh
+        run: Copy-Item publish/win-x64/Cluxo.Windows.App.exe "publish/win-x64/Cluxo-$env:RELEASE_TAG-win-x64.exe"
+
+      - name: Inno Setup 설치
+        shell: pwsh
+        run: choco install innosetup -y --no-progress
+
+      - name: 설치 프로그램 빌드 (Cluxo-Setup)
         shell: pwsh
         run: |
-          Copy-Item publish/win-x64/Cluxo.Windows.App.exe "publish/win-x64/Cluxo-$env:RELEASE_TAG-win-x64.exe"
+          $appver = $env:RELEASE_TAG -replace '^v',''
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DAppVersion=$appver" installer\cluxo.iss
 
-      - name: GitHub 릴리스 생성 + exe 첨부
+      - name: GitHub 릴리스 생성 + 포터블 exe·설치 프로그램 첨부
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create $env:RELEASE_TAG "publish/win-x64/Cluxo-$env:RELEASE_TAG-win-x64.exe" `
+          $appver = $env:RELEASE_TAG -replace '^v',''
+          gh release create $env:RELEASE_TAG `
+            "publish/win-x64/Cluxo-$env:RELEASE_TAG-win-x64.exe" `
+            "installer-out/Cluxo-Setup-$appver.exe" `
             --title "Cluxo $env:RELEASE_TAG" --generate-notes
