@@ -356,8 +356,11 @@ public sealed class OverlayCoordinator : IDisposable
     // ToolbarVisual(렌더)을 동시에 채운다. mon 하단 중앙 배치. (맥 DrawingToolbarView 대응)
     private ToolbarVisual BuildToolbar(MonitorInfo mon)
     {
-        const double pad = 14, toolD = 34, toolGap = 7, thickHit = 22, thickGap = 4,
-                     colorHit = 22, colorGap = 4, groupGap = 18, closeD = 30, bottomMargin = 110;
+        // 치수는 논리(DIP) 기준 → 물리 픽셀로 환산(× DpiScale)해 화면 좌표로 배치한다. 렌더(ToLocalRect)가
+        // 다시 ÷DpiScale 하므로, 이렇게 해야 고배율에서도 의도한 크기로 보인다. (전엔 물리=논리로 둬 절반 크기였음)
+        double dpi = mon.DpiScale <= 0 ? 1.0 : mon.DpiScale;
+        double pad = 14 * dpi, toolD = 38 * dpi, toolGap = 7 * dpi, thickHit = 24 * dpi, thickGap = 4 * dpi,
+               colorHit = 24 * dpi, colorGap = 4 * dpi, groupGap = 18 * dpi, closeD = 34 * dpi, bottomMargin = 150 * dpi;
         var steps = Tokens.Drawing.LineWidthSteps;
         var colors = ColorPalette;
 
