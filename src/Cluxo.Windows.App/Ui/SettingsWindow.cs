@@ -216,6 +216,18 @@ internal sealed class SettingsWindow : Window
             HorizontalAlignment = HorizontalAlignment.Right, Foreground = TextPrimary, FontSize = 13,
         }));
         content.Children.Add(new Border { Height = 1, Background = DividerBrush, Margin = new Thickness(-14, 0, -14, 8) });
+
+        // 업데이트 매니페스트 URL — 배포/코브랜딩 시 미리 채우거나, 여기서 직접 입력.
+        content.Children.Add(new TextBlock { Text = "업데이트 URL (매니페스트 JSON)", Foreground = TextMuted, FontSize = 11, Margin = new Thickness(0, 0, 0, 4) });
+        var urlBox = new TextBox
+        {
+            Text = s.UpdateManifestUrl, FontSize = 12, Foreground = TextPrimary,
+            Background = System.Windows.Media.Brushes.Transparent, BorderThickness = new Thickness(0),
+            Padding = new Thickness(9, 6, 9, 6), VerticalContentAlignment = VerticalAlignment.Center,
+        };
+        urlBox.TextChanged += (_, _) => s.UpdateManifestUrl = urlBox.Text.Trim();
+        content.Children.Add(new Border { Background = SegTrack, CornerRadius = new CornerRadius(6), Child = urlBox, Margin = new Thickness(0, 0, 0, 10) });
+
         content.Children.Add(btnRow);
         content.Children.Add(status);
 
