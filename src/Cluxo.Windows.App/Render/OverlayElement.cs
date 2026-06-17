@@ -156,26 +156,34 @@ internal sealed class OverlayElement : FrameworkElement
     }
 
     // ── 스크롤 방향 화살표 ──────────────────────────────────────
+    // 스크롤 인디케이터 — 맥 ScrollIndicatorView: 어두운 캡슐 + 흰 화살표 글리프, 크기는 스크롤 양 비례,
+    // 커서 위(-36)에 떠서 스크롤 방향으로 살짝 드리프트하며 페이드.
     private void DrawScrolls(DrawingContext dc, IReadOnlyList<ScrollEffect> scrolls, Rgba color)
     {
+        double ppd = _monitor.DpiScale <= 0 ? 1.0 : _monitor.DpiScale;
         foreach (var s in scrolls)
         {
             double p = Progress(s.Id, s.ExpiresAt);
             double alpha = 1 - p;
-            double len = 16 + Math.Min(20, s.Magnitude * 4);
+            string arrow = s.IsVertical ? (s.IsPositive ? "↑" : "↓") : (s.IsPositive ? "→" : "←");
+            double mag = Math.Min(Math.Max(s.Magnitude, 3), 60);
+            double fontSize = 16 + mag * 0.36; // 맥과 동일 매핑
+
             var c = ToLocal(s.Position);
-            // 방향 단위벡터(화면 좌표, y 아래로 +)
-            double dx = s.IsVertical ? 0 : (s.IsPositive ? 1 : -1);
-            double dy = s.IsVertical ? (s.IsPositive ? -1 : 1) : 0; // 세로 +는 위로(forward)
-            var tip = new Point(c.X + dx * len, c.Y + dy * len);
-            var tail = new Point(c.X - dx * len, c.Y - dy * len);
-            var pen = StrokePen(color, 3, alpha);
-            dc.DrawLine(pen, tail, tip);
-            // 화살촉
-            double theta = Math.Atan2(tip.Y - tail.Y, tip.X - tail.X);
-            double hl = 9, ha = Math.PI / 6;
-            dc.DrawLine(pen, tip, new Point(tip.X - hl * Math.Cos(theta - ha), tip.Y - hl * Math.Sin(theta - ha)));
-            dc.DrawLine(pen, tip, new Point(tip.X - hl * Math.Cos(theta + ha), tip.Y - hl * Math.Sin(theta + ha)));
+            double dirx = s.IsVertical ? 0 : (s.IsPositive ? 1 : -1);
+            double diry = s.IsVertical ? (s.IsPositive ? -1 : 1) : 0;
+            double drift = p * 14; // 방향으로 드리프트
+            var center = new Point(c.X + dirx * drift, c.Y - 36 + diry * drift);
+
+            var ft = new FormattedText(arrow, CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
+                new Typeface(new FontFamily("Segoe UI"), FontStyles.Normal, FontWeights.Bold, FontStretches.Normal),
+                fontSize, MakeBrush(Rgba.FromWhite(1.0), alpha), ppd);
+
+            double padX = 11, padY = 5;
+            double w = ft.Width + padX * 2, h = ft.Height + padY * 2;
+            var rect = new Rect(center.X - w / 2, center.Y - h / 2, w, h);
+            dc.DrawRoundedRectangle(MakeBrush(Rgba.FromBlack(0.62), alpha), null, rect, h / 2, h / 2); // 캡슐
+            dc.DrawText(ft, new Point(rect.X + padX, rect.Y + padY));
         }
     }
 
