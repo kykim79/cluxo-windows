@@ -67,7 +67,14 @@ internal sealed class SettingsWindow : Window
 
         var root = new StackPanel { Background = WindowBg };
         root.Children.Add(new Border { Padding = new Thickness(10, 12, 10, 4), Child = bar });
-        root.Children.Add(host);
+        // 화면 높이를 넘기면 스크롤(창이 화면 밖으로 잘리지 않게). 탭바는 위에 고정.
+        root.Children.Add(new ScrollViewer
+        {
+            Content = host,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            MaxHeight = Math.Max(360, SystemParameters.WorkArea.Height - 170),
+        });
         return root;
     }
 
@@ -265,17 +272,15 @@ internal sealed class SettingsWindow : Window
     {
         var p = new StackPanel();
         p.Children.Add(Card(("표시 언어", SegEnum(s.PreferredLanguage, v => s.PreferredLanguage = v, v => v.Label()))));
-        p.Children.Add(Caption("변경 후 재시작해야 적용됩니다."));
 
-        // 시작 — 로그인 시 실행 + 발표/녹화 앱 자동 활성화
+        // 시작·자동 — 로그인 + 자동 활성화 + 낯선 모니터 자동 표시 (한 카드)
         p.Children.Add(Card(
             ("로그인 시 실행", Switch(launch.IsEnabled, v => launch.IsEnabled = v)),
-            ("자동 활성화", Switch(s.IsAutoActivateEnabled, v => s.IsAutoActivateEnabled = v))));
-        p.Children.Add(Caption("Zoom·OBS·PowerPoint 등이 켜지면 자동으로 활성화."));
+            ("자동 활성화", Switch(s.IsAutoActivateEnabled, v => s.IsAutoActivateEnabled = v)),
+            ("낯선 모니터 자동표시", Switch(s.IsAutoKeystrokeOnUnknownMonitor, v => s.IsAutoKeystrokeOnUnknownMonitor = v))));
+        p.Children.Add(Caption("자동 활성화: Zoom·OBS 등 감지. 낯선 모니터: 처음 보는 외장 모니터에 키 입력 표시 ON."));
 
-        // 낯선 외장 모니터 자동 표시 + 신뢰 목록
-        p.Children.Add(Card(("낯선 모니터 자동 표시", Switch(s.IsAutoKeystrokeOnUnknownMonitor, v => s.IsAutoKeystrokeOnUnknownMonitor = v))));
-        p.Children.Add(Caption("처음 연결하는 외장 모니터(회의실 등)에 키 입력 표시 자동 ON. 자주 쓰는 모니터는 아래 신뢰 등록으로 제외."));
+        // 연결된 모니터 신뢰 목록 (있을 때만 — 신뢰 ON이면 자동표시 제외)
         var monitors = Cluxo.Windows.App.Shell.MonitorIdentity.Connected();
         if (monitors.Count > 0)
         {
@@ -286,17 +291,13 @@ internal sealed class SettingsWindow : Window
                 rows[i] = (name, Switch(s.IsTrustedMonitor(id), v => s.SetTrusted(id, v)));
             }
             p.Children.Add(Card(rows));
-            p.Children.Add(Caption("연결된 모니터 — 신뢰 ON이면 자동 표시에서 제외."));
         }
 
-        // 커서 — 숨김 대기(링 페이드)
-        p.Children.Add(Card(("숨김 대기", SliderRow(s.RingHideSeconds, 0, 10, 0.5,
-            v => s.RingHideSeconds = v, v => v <= 0 ? "끔" : $"{v:0.0}초"))));
-        p.Children.Add(Caption("안 움직이면 링이 사라지는 시간. 0=항상 표시."));
-
-        // 스크린샷 모드 — 외부 캡처에서 오버레이 제외(WDA)
-        p.Children.Add(Card(("스크린샷 모드", Switch(s.IsScreenshotMode, v => s.IsScreenshotMode = v))));
-        p.Children.Add(Caption("외부 캡처(OBS·스크린샷)에서 오버레이 제외. 재시작 시 해제."));
+        // 커서·캡처 — 숨김 대기 + 스크린샷 모드 (한 카드)
+        p.Children.Add(Card(
+            ("숨김 대기", SliderRow(s.RingHideSeconds, 0, 10, 0.5, v => s.RingHideSeconds = v, v => v <= 0 ? "끔" : $"{v:0.0}초")),
+            ("스크린샷 모드", Switch(s.IsScreenshotMode, v => s.IsScreenshotMode = v))));
+        p.Children.Add(Caption("숨김 대기: 안 움직이면 링이 사라지는 시간(0=항상). 스크린샷 모드: 외부 캡처에서 오버레이 제외."));
 
         p.Children.Add(AppInfoSection());
         p.Children.Add(UpdateSection(s));
