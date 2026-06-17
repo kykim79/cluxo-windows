@@ -89,7 +89,8 @@ public readonly record struct OverlayFrame(
     DragVisual? Drag = null,                 // 드래그 시각 힌트(커서 있는 모니터만)
     RadialVisual? Radial = null,             // 라디얼 메뉴(중심 있는 모니터만)
     bool Inspector = false,                  // ⌃⌥I 좌표 표시(커서 있는 모니터가 좌표 라벨 렌더)
-    ToolbarVisual? Toolbar = null            // 그리기 모드 플로팅 툴바(툴바 있는 모니터만)
+    ToolbarVisual? Toolbar = null,           // 그리기 모드 플로팅 툴바(툴바 있는 모니터만)
+    RingShape RingShape = RingShape.Circle   // 현재 링 모양 — 효과(클릭/흔들기 등)가 따라가도록 항상 전달
 );
 
 /// <summary>

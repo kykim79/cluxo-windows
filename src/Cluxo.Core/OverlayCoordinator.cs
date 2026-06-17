@@ -338,7 +338,7 @@ public sealed class OverlayCoordinator : IDisposable
                     radialValues, radialSubActive, radialSubSubActive)
                 : null;
             result.Add((renderer, new OverlayFrame(monitor.Id, cursorHere, ring, shapes, branding, effects, keystroke, drag, radial,
-                _runtime.IsInspectorActive, toolbarHere)));
+                _runtime.IsInspectorActive, toolbarHere, _ringShape)));
         }
         return result;
     }

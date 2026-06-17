@@ -265,7 +265,7 @@ internal static class SelfTest
     private static OverlayFrame BuildFxFrame()
     {
         var accent = new Rgba(0, 230, 255);
-        var ring = new RingVisual(accent, 27, 1.0, 1.0);
+        var ring = new RingVisual(accent, 27, 1.0, 1.0, RingShape.Hexagon); // 효과가 모양 따라가는지 검증
 
         var trail = new List<TrailPoint>();
         for (int i = 0; i < 12; i++)
@@ -285,7 +285,7 @@ internal static class SelfTest
         var branding = new BrandingConfig { CompanyName = "Acme Corp", AccentColor = new Rgba(255, 150, 40) };
 
         return new OverlayFrame("M", new PointD(120, 110), ring, Array.Empty<DrawingShape>(),
-            branding, effects, "Ctrl+Alt+D", drag, radial, Inspector: true);
+            branding, effects, "Ctrl+Alt+D", drag, radial, Inspector: true, RingShape: RingShape.Hexagon);
     }
 
     private static OverlayFrame BuildShapeFrame()

@@ -88,10 +88,10 @@ internal sealed class OverlayElement : FrameworkElement
         DrawTrail(dc, f.Effects.Trail, accent, 3, 0.5);       // 커서 모션 잔상
         DrawTrail(dc, f.Effects.DragTrail, accent, 5, 0.7);   // 드래그 streak
         DrawScrolls(dc, f.Effects.Scrolls, accent);
-        DrawExpandingRings(dc, f.Effects.Shakes.Select(e => (e.Id, e.Position, e.ExpiresAt)), accent, 22, 70, 4, 0.9);
-        DrawExpandingRings(dc, f.Effects.IdlePulses.Select(e => (e.Id, e.Position, e.ExpiresAt)), accent, 10, 44, 2, 0.5);
-        DrawExpandingRings(dc, f.Effects.DoubleClicks.Select(e => (e.Id, e.Position, e.ExpiresAt)), accent, 18, 64, 3, 0.8);
-        DrawClicks(dc, f.Effects.Clicks, accent);
+        DrawExpandingRings(dc, f.Effects.Shakes.Select(e => (e.Id, e.Position, e.ExpiresAt)), accent, 22, 70, 4, 0.9, f.RingShape);
+        DrawExpandingRings(dc, f.Effects.IdlePulses.Select(e => (e.Id, e.Position, e.ExpiresAt)), accent, 10, 44, 2, 0.5, f.RingShape);
+        DrawExpandingRings(dc, f.Effects.DoubleClicks.Select(e => (e.Id, e.Position, e.ExpiresAt)), accent, 18, 64, 3, 0.8, f.RingShape);
+        DrawClicks(dc, f.Effects.Clicks, accent, f.RingShape);
 
         DrawRing(dc, f);
         DrawDrag(dc, f);
@@ -177,28 +177,28 @@ internal sealed class OverlayElement : FrameworkElement
         }
     }
 
-    // ── 퍼지는 ring (흔들기/정지펄스/더블클릭 공용) ─────────────
+    // ── 퍼지는 ring (흔들기/정지펄스/더블클릭 공용) — 링 모양을 따라간다 ─────
     private void DrawExpandingRings(DrawingContext dc, IEnumerable<(int Id, PointD Pos, double ExpiresAt)> items,
-        Rgba color, double r0, double r1, double width, double maxAlpha)
+        Rgba color, double r0, double r1, double width, double maxAlpha, RingShape shape)
     {
         foreach (var (id, pos, expiresAt) in items)
         {
             double p = Progress(id, expiresAt);
             double radius = r0 + p * (r1 - r0);
             double alpha = (1 - p) * maxAlpha;
-            dc.DrawEllipse(null, StrokePen(color, width, alpha), ToLocal(pos), radius, radius);
+            dc.DrawGeometry(null, StrokePen(color, width, alpha), RingGeometry(ToLocal(pos), radius, shape));
         }
     }
 
-    // ── 클릭 ripple ─────────────────────────────────────────────
-    private void DrawClicks(DrawingContext dc, IReadOnlyList<ClickEffect> clicks, Rgba color)
+    // ── 클릭 ripple — 링 모양을 따라간다 ─────────────────────────
+    private void DrawClicks(DrawingContext dc, IReadOnlyList<ClickEffect> clicks, Rgba color, RingShape shape)
     {
         foreach (var c in clicks)
         {
             double p = Progress(c.Id, c.ExpiresAt);
             double radius = 12 + p * 40;
             double alpha = (1 - p) * (c.IsRight ? 0.5 : 0.75);
-            dc.DrawEllipse(null, StrokePen(color, c.IsDouble ? 4 : 2, alpha), ToLocal(c.Position), radius, radius);
+            dc.DrawGeometry(null, StrokePen(color, c.IsDouble ? 4 : 2, alpha), RingGeometry(ToLocal(c.Position), radius, shape));
         }
     }
 
