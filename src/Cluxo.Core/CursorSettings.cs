@@ -37,6 +37,12 @@ public sealed class CursorSettings
     public double KeystrokeTimeout { get => Get("keystrokeTimeout", 3.0); set => Set("keystrokeTimeout", value); }
     public double IdleTimeout { get => Get("idleTimeout", 3.0); set => Set("idleTimeout", value); }
 
+    /// <summary>숨김 대기(초) — 커서가 안 움직이면 링이 페이드 아웃되기까지 대기. 0=숨기지 않음(항상 표시).</summary>
+    public double RingHideSeconds { get => Get("ringHideSeconds", 0.0); set => Set("ringHideSeconds", value); }
+
+    /// <summary>발표·녹화 앱(Zoom·OBS·Teams·PowerPoint 등) 포그라운드 시 Cluxo 자동 활성화.</summary>
+    public bool IsAutoActivateEnabled { get => Get("isAutoActivate", false); set => Set("isAutoActivate", value); }
+
     // ── 효과 토글 (v1.0 minimalist default) ──────────────────────
     public bool IsGlowEnabled { get => Get("isGlowEnabled", false); set => Set("isGlowEnabled", value); }
     public bool IsKeystrokeEnabled { get => Get("isKeystrokeEnabled", false); set => Set("isKeystrokeEnabled", value); }

@@ -28,6 +28,7 @@ internal sealed class WpfOverlayRenderer : IOverlayRenderer
     public void Render(in OverlayFrame frame) => _window.Element.SetFrame(frame);
 
     internal void SetClickThrough(bool enabled) => _window.SetClickThrough(enabled);
+    internal void SetCaptureExcluded(bool excluded) => _window.SetCaptureExcluded(excluded);
 
     /// <summary>이 오버레이 창의 HWND — 돋보기(Magnification) 확대 대상 제외 목록용. UI 스레드에서 호출.</summary>
     internal IntPtr Hwnd => new System.Windows.Interop.WindowInteropHelper(_window).Handle;

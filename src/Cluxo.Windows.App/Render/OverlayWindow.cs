@@ -55,4 +55,12 @@ internal sealed class OverlayWindow : Window
         if (enabled) UpdateExStyle(hwnd, WS_EX_TRANSPARENT, 0);
         else UpdateExStyle(hwnd, 0, WS_EX_TRANSPARENT);
     }
+
+    /// <summary>스크린샷 모드 — 외부 캡처(OBS·스크린샷)에서 이 overlay 제외(true) / 정상 표시(false).</summary>
+    public void SetCaptureExcluded(bool excluded)
+    {
+        var hwnd = new WindowInteropHelper(this).Handle;
+        if (hwnd == IntPtr.Zero) return;
+        SetWindowDisplayAffinity(hwnd, excluded ? WDA_EXCLUDEFROMCAPTURE : WDA_NONE);
+    }
 }

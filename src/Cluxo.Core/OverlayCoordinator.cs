@@ -93,6 +93,13 @@ public sealed class OverlayCoordinator : IDisposable
     private bool _idlePulsed;
     private const double IdleDeadband = 4;
 
+    // 숨김 대기 — 커서가 안 움직이면 링을 페이드 아웃. 0이면 비활성(항상 표시).
+    private double _ringHideSeconds;
+    private double _lastMoveTime = -1; // -1 = 첫 프레임 미초기화
+    private PointD _lastMovePos;
+    private double _ringFade = 1.0;
+    private const double RingFadeDuration = 0.5; // 페이드 시간(초)
+
     private const string LineWidthKey = "drawing.lineWidth";
     private const double DoubleClickWindow = 0.4;
     private const double DoubleClickRadius = 6;
@@ -208,6 +215,12 @@ public sealed class OverlayCoordinator : IDisposable
         lock (_gate)
         {
             _runtime.CursorPosition = pos;
+
+            // 숨김 대기 — 커서가 안 움직이면 링을 페이드 아웃(움직이면 즉시 복귀). 활성/비활성 무관 추적.
+            if (_lastMoveTime < 0 || Math.Abs(pos.X - _lastMovePos.X) + Math.Abs(pos.Y - _lastMovePos.Y) > 2)
+            { _lastMoveTime = now; _lastMovePos = pos; }
+            _ringFade = _ringHideSeconds <= 0 ? 1.0
+                : Math.Max(0.0, 1.0 - Math.Max(0.0, (now - _lastMoveTime) - _ringHideSeconds) / RingFadeDuration);
 
             // 비활성화(트레이 토글) — 아무것도 그리지 않는다(맥 비활성화 대응). 효과 처리도 건너뜀.
             if (!_active)
@@ -354,7 +367,7 @@ public sealed class OverlayCoordinator : IDisposable
             }
             RingVisual? ring = cursorHere is null
                 ? null
-                : new RingVisual(_activeColor, _ringRadius, Scale: 1.0, _ringOpacity,
+                : new RingVisual(_activeColor, _ringRadius, Scale: 1.0, _ringOpacity * _ringFade,
                     _ringShape, _ringBorderWidth, _ringDashed, _glowEnabled,
                     _hasInnerRing, _ringFillEnabled, sx, sy, sAngle);
             // 효과는 이 모니터 영역 것만 (Mac의 per-screen 필터). TODO: 프레임당 Where/ToArray 최적화
@@ -525,6 +538,8 @@ public sealed class OverlayCoordinator : IDisposable
             _idlePulseEnabled = _settingsModel.IsIdlePulseEnabled;
             _dragAngleLabelEnabled = _settingsModel.IsDragAngleLabelEnabled;
             _idleTimeout = _settingsModel.IdleTimeout;
+            _ringHideSeconds = _settingsModel.RingHideSeconds;
+            _autoActivateEnabled = _settingsModel.IsAutoActivateEnabled;
         }
     }
 
@@ -905,9 +920,29 @@ public sealed class OverlayCoordinator : IDisposable
         _settings.Save(_store);
     }
 
+    // 발표·녹화·회의 앱 프로세스명(소문자 부분일치). Zoom·OBS·Teams·PowerPoint·Meet·Webex·Slack 등.
+    private static readonly string[] PresentationApps =
+    {
+        "zoom", "obs", "obs64", "teams", "ms-teams", "powerpnt", "wpp", "webex", "webexmta",
+        "gotomeeting", "slack", "discord", "skype", "anydesk", "camtasia", "screenrec",
+    };
+
+    private bool _autoActivateEnabled;
+
+    /// <summary>발표/녹화 앱이 포그라운드로 오면(설정 ON) Cluxo를 자동 활성화. (맥 자동 활성화 대응, 비활성화는 안 함)</summary>
     private void OnForegroundChanged(ForegroundApp app)
     {
-        // TODO: 발표/녹화 앱 감지 시 키스트로크 표시 등 켜기(발표 안전). MonitorIdentity/trust 이식 시.
+        bool fire;
+        lock (_gate)
+        {
+            if (!_autoActivateEnabled || _active) return;
+            string name = (app.ProcessName ?? "").ToLowerInvariant();
+            bool isPresentation = false;
+            foreach (var p in PresentationApps) if (name.Contains(p)) { isPresentation = true; break; }
+            if (!isPresentation) return;
+            _active = true; fire = true;
+        }
+        if (fire) ActiveChanged?.Invoke(true);
     }
 
     private void RebuildRenderers()

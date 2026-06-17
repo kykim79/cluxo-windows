@@ -181,7 +181,9 @@ internal static class Program
                 return c;
             },
             // ⌃⌥M 돋보기 — 렌더 호스트가 매 프레임 폴링해 Magnification 창을 구동.
-            magnifierProvider: () => coordinator.CurrentMagnifier);
+            magnifierProvider: () => coordinator.CurrentMagnifier,
+            // 스크린샷 모드 — true면 외부 캡처(OBS·스크린샷)에서 오버레이 제외(WDA).
+            screenshotMode: () => coordinator.Settings.IsScreenshotMode);
 
         // 테스트용 자동 종료 — 프로덕션 종료 경로를 그대로 타서 검증(--exit-after-ms N).
         using var autoExit = ScheduleAutoExit(args, exit);

@@ -13,6 +13,11 @@ internal static class RenderNativeMethods
     public const uint WS_EX_NOACTIVATE = 0x08000000;  // 포커스 안 뺏음
     public const uint WS_EX_LAYERED = 0x00080000;     // WPF AllowsTransparency가 사용
 
+    // 외부 캡처(스크린샷·OBS)에서 창 제외 — WDA_EXCLUDEFROMCAPTURE. WDA_NONE=정상 캡처.
+    public const uint WDA_NONE = 0x0, WDA_EXCLUDEFROMCAPTURE = 0x11;
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern bool SetWindowDisplayAffinity(IntPtr hWnd, uint dwAffinity);
+
     public static readonly IntPtr HWND_TOPMOST = new(-1);
     public const uint SWP_NOACTIVATE = 0x0010;
     public const uint SWP_NOSIZE = 0x0001;
