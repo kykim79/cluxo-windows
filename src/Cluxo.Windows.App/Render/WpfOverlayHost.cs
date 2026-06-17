@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Windows;
 using System.Windows.Threading;
 using Cluxo.Core;
@@ -26,6 +27,8 @@ public sealed class WpfOverlayHost : IDisposable
     private readonly List<WpfOverlayRenderer> _renderers = new();
     private DispatcherTimer? _timer;
     private Func<bool>? _capturesInput;
+    private Func<MagnifierState?>? _magnifierProvider;
+    private MagnifierWindow? _magnifier;
     private bool _lastCapturesInput;
     private bool _disposed;
 
@@ -55,19 +58,40 @@ public sealed class WpfOverlayHost : IDisposable
     /// UI 스레드에서 ~60Hz로 renderFrame 구동. capturesInput을 주면 그리기/라디얼 모드에서
     /// 클릭통과를 끈다(P1, 상태 변경 시에만 토글).
     /// </summary>
-    public void StartRenderLoop(Action renderFrame, Func<bool>? capturesInput = null)
+    public void StartRenderLoop(Action renderFrame, Func<bool>? capturesInput = null, Func<MagnifierState?>? magnifierProvider = null)
     {
         _capturesInput = capturesInput;
+        _magnifierProvider = magnifierProvider;
         _dispatcher.Invoke(() =>
         {
+            if (_magnifierProvider is not null) _magnifier = new MagnifierWindow(); // 메시지 펌프 있는 UI 스레드에서 생성
             _timer = new DispatcherTimer(DispatcherPriority.Render) { Interval = TimeSpan.FromMilliseconds(16) };
             _timer.Tick += (_, _) =>
             {
                 ApplyClickThrough();
                 renderFrame();
+                UpdateMagnifier();
             };
             _timer.Start();
         });
+    }
+
+    // 돋보기 — 코디네이터 상태를 폴링해 Magnification 창을 구동. 우리 오버레이 창들은 확대 대상에서 제외.
+    private void UpdateMagnifier()
+    {
+        if (_magnifier is null || _magnifierProvider is null) return;
+        var state = _magnifierProvider();
+        if (state is { } m)
+        {
+            IntPtr[] exclude;
+            lock (_renderers) exclude = _renderers.Select(r => r.Hwnd).Where(h => h != IntPtr.Zero).ToArray();
+            _magnifier.Update((int)Math.Round(m.CursorPhysical.X), (int)Math.Round(m.CursorPhysical.Y),
+                m.Zoom, (int)Math.Round(m.LensPhysical), exclude);
+        }
+        else
+        {
+            _magnifier.Hide();
+        }
     }
 
     private void ApplyClickThrough()
@@ -99,7 +123,7 @@ public sealed class WpfOverlayHost : IDisposable
     {
         if (_disposed) return;
         _disposed = true;
-        _dispatcher.Invoke(() => { _timer?.Stop(); _app?.Shutdown(); });
+        _dispatcher.Invoke(() => { _timer?.Stop(); _magnifier?.Dispose(); _app?.Shutdown(); });
         _thread.Join(1000); // WPF Application.Run 종료 — 정상은 ~수ms
         _ready.Dispose();
     }

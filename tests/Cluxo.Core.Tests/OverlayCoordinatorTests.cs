@@ -927,20 +927,21 @@ public class OverlayCoordinatorTests
     }
 
     [Fact]
-    public void Magnifier_Active_SetsFrameMagnifier_OnCursorMonitor()
+    public void Magnifier_Active_ExposesCurrentMagnifier()
     {
-        var h = new Harness(Harness.MonA, Harness.MonB);
+        var h = new Harness();
         h.Coordinator.Start();
-        h.Cursor.Position = new PointD(100, 100); // 모니터 A
+        h.Cursor.Position = new PointD(100, 100);
         h.Coordinator.RenderFrame();
-        Assert.Null(h.Factory.Created["A"].Last!.Value.Magnifier); // 기본 OFF
+        Assert.Null(h.Coordinator.CurrentMagnifier); // 기본 OFF
 
         h.Hotkeys.Press(new HotkeyChord(KeyModifiers.Control | KeyModifiers.Alt, "M")); // ⌃⌥M
         h.Coordinator.RenderFrame();
-        var mag = h.Factory.Created["A"].Last!.Value.Magnifier;
+        var mag = h.Coordinator.CurrentMagnifier;
         Assert.NotNull(mag);
-        Assert.Equal(2.0, mag!.Value.Zoom);                           // 기본 배율
-        Assert.Null(h.Factory.Created["B"].Last!.Value.Magnifier);    // 커서 없는 모니터엔 렌즈 없음
+        Assert.Equal(2.0, mag!.Value.Zoom);                       // 기본 배율
+        Assert.Equal(new PointD(100, 100), mag.Value.CursorPhysical);
+        Assert.Equal(200.0, mag.Value.LensPhysical);              // 기본 크기 200 × dpi 1.0
     }
 
     [Fact]

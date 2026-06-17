@@ -159,7 +159,9 @@ internal static class Program
                 bool c = coordinator.IsDrawingModeActive || coordinator.IsRadialMenuActive;
                 input.CaptureMouseButtons = c;
                 return c;
-            });
+            },
+            // ⌃⌥M 돋보기 — 렌더 호스트가 매 프레임 폴링해 Magnification 창을 구동.
+            magnifierProvider: () => coordinator.CurrentMagnifier);
 
         // 테스트용 자동 종료 — 프로덕션 종료 경로를 그대로 타서 검증(--exit-after-ms N).
         using var autoExit = ScheduleAutoExit(args, exit);

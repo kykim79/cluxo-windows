@@ -111,6 +111,24 @@ public sealed class OverlayCoordinator : IDisposable
     public bool IsRadialMenuActive { get { lock (_gate) return _runtime.IsRadialMenuActive; } }
     public bool IsSpotlightActive { get { lock (_gate) return _runtime.IsSpotlightActive; } }
 
+    /// <summary>
+    /// ⌃⌥M 돋보기 상태 — 활성이면 커서 물리 좌표·배율·렌즈 물리 지름, 아니면 null.
+    /// 렌더 호스트가 매 프레임 폴링해 Magnification API 창을 구동한다(WPF 렌더와 별도).
+    /// </summary>
+    public MagnifierState? CurrentMagnifier
+    {
+        get
+        {
+            lock (_gate)
+            {
+                if (!_runtime.IsMagnifierActive) return null;
+                var pos = _runtime.CursorPosition;
+                double dpi = MonitorContaining(pos)?.DpiScale ?? 1.0;
+                return new MagnifierState(pos, _magnifierZoom, _magnifierSize * dpi);
+            }
+        }
+    }
+
     /// <summary>라이브 설정 모델(설정창이 편집 → Changed로 즉시 적용·영구화). Start 후 유효.</summary>
     public CursorSettings Settings => _settingsModel;
 
@@ -275,10 +293,6 @@ public sealed class OverlayCoordinator : IDisposable
         SpotlightVisual? spotlight = _runtime.IsSpotlightActive
             ? new SpotlightVisual(_spotlightRadius, _spotlightSoftness)
             : null;
-        // 돋보기 — 활성 시 커서 모니터에만(렌즈가 커서 따라감).
-        MagnifierVisual? magnifier = _runtime.IsMagnifierActive
-            ? new MagnifierVisual(_magnifierZoom, _magnifierSize)
-            : null;
 
         // 그리기 툴바 — 활성 시 커서 모니터(없으면 첫 모니터) 하단 중앙에 1회 레이아웃.
         // DrawingState 프레임(히트테스트)과 ToolbarVisual(렌더)을 동시에 채운다.
@@ -334,8 +348,7 @@ public sealed class OverlayCoordinator : IDisposable
                     radialValues, radialSubActive, radialSubSubActive)
                 : null;
             result.Add((renderer, new OverlayFrame(monitor.Id, cursorHere, ring, shapes, branding, effects, keystroke, drag, radial,
-                _runtime.IsInspectorActive, toolbarHere, _ringShape, spotlight,
-                cursorHere is null ? null : magnifier)));
+                _runtime.IsInspectorActive, toolbarHere, _ringShape, spotlight)));
         }
         return result;
     }
