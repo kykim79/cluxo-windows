@@ -145,22 +145,22 @@ internal sealed class SettingsWindow : Window
     {
         var p = new StackPanel();
         p.Children.Add(Card(("표시 언어", SegEnum(s.PreferredLanguage, v => s.PreferredLanguage = v, v => v.Label()))));
-        p.Children.Add(Note("변경 후 재시작해야 적용됩니다."));
+        p.Children.Add(Caption("변경 후 재시작해야 적용됩니다."));
 
         // 시작 — 로그인 시 실행 + 발표/녹화 앱 자동 활성화
         p.Children.Add(Card(
             ("로그인 시 실행", Switch(launch.IsEnabled, v => launch.IsEnabled = v)),
             ("자동 활성화", Switch(s.IsAutoActivateEnabled, v => s.IsAutoActivateEnabled = v))));
-        p.Children.Add(Note("Zoom·OBS·PowerPoint 등이 켜지면 자동으로 활성화."));
+        p.Children.Add(Caption("Zoom·OBS·PowerPoint 등이 켜지면 자동으로 활성화."));
 
         // 커서 — 숨김 대기(링 페이드)
         p.Children.Add(Card(("숨김 대기", SliderRow(s.RingHideSeconds, 0, 10, 0.5,
             v => s.RingHideSeconds = v, v => v <= 0 ? "끔" : $"{v:0.0}초"))));
-        p.Children.Add(Note("안 움직이면 링이 사라지는 시간. 0=항상 표시."));
+        p.Children.Add(Caption("안 움직이면 링이 사라지는 시간. 0=항상 표시."));
 
         // 스크린샷 모드 — 외부 캡처에서 오버레이 제외(WDA)
         p.Children.Add(Card(("스크린샷 모드", Switch(s.IsScreenshotMode, v => s.IsScreenshotMode = v))));
-        p.Children.Add(Note("외부 캡처(OBS·스크린샷)에서 오버레이 제외. 재시작 시 해제."));
+        p.Children.Add(Caption("외부 캡처(OBS·스크린샷)에서 오버레이 제외. 재시작 시 해제."));
 
         p.Children.Add(AppInfoSection());
         p.Children.Add(UpdateSection(s));
@@ -354,6 +354,13 @@ internal sealed class SettingsWindow : Window
         grid.Children.Add(control);
         return grid;
     }
+
+    // 박스 없는 작은 회색 캡션 — 카드 바로 아래(공간 절약). Note()의 박스형보다 압축적.
+    private static FrameworkElement Caption(string text) => new TextBlock
+    {
+        Text = text, Foreground = TextMuted, FontSize = 11, TextWrapping = TextWrapping.Wrap, LineHeight = 15,
+        Margin = new Thickness(4, -6, 4, 11),
+    };
 
     private static FrameworkElement Note(string text) => new Border
     {
