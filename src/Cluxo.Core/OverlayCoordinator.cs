@@ -255,7 +255,12 @@ public sealed class OverlayCoordinator : IDisposable
                 if (drawing)
                 {
                     // 그리기 드래그 경로 — 후킹이 아니라 프레임 샘플 위치를 따라간다(하이브리드 입력)
-                    if (_leftDown) _drawing.UpdateShape(pos);
+                    if (_leftDown && _draggingToolbar)
+                    {
+                        _toolbarOffset = new PointD(_toolbarOffset.X + (pos.X - _toolbarDragLast.X), _toolbarOffset.Y + (pos.Y - _toolbarDragLast.Y));
+                        _toolbarDragLast = pos;
+                    }
+                    else if (_leftDown) _drawing.UpdateShape(pos);
                 }
                 else
                 {
@@ -421,6 +426,10 @@ public sealed class OverlayCoordinator : IDisposable
     }
 
     private RectD _toolbarCloseRect; // 그리기 툴바 종료(✕) 버튼 — BuildToolbar에서 갱신, OnButtonDown에서 히트테스트.
+    private RectD _toolbarBounds;     // 툴바 전체 영역 — 배경(아이템 아닌 곳) 드래그로 이동.
+    private PointD _toolbarOffset;    // 기본 위치(하단 중앙)로부터의 드래그 이동량.
+    private bool _draggingToolbar;
+    private PointD _toolbarDragLast;
 
     // 도구 표시 순서 (맥 DrawingToolbarView와 동일): 펜·직선·화살표·사각형·타원·형광펜·뱃지.
     private static readonly DrawingTool[] ToolbarOrder =
@@ -447,9 +456,14 @@ public sealed class OverlayCoordinator : IDisposable
         double panelW = toolsW + groupGap + thickW + groupGap + colorW + groupGap + closeD + pad * 2;
         double panelH = toolD + pad * 2;
 
-        double left = mon.Bounds.X + (mon.Bounds.Width - panelW) / 2;
-        double top = mon.Bounds.Y + mon.Bounds.Height - bottomMargin - panelH;
+        double baseLeft = mon.Bounds.X + (mon.Bounds.Width - panelW) / 2;
+        double baseTop = mon.Bounds.Y + mon.Bounds.Height - bottomMargin - panelH;
+        // 드래그 오프셋 적용 + 모니터 안으로 클램프. 오프셋을 클램프 값으로 재동기화(드래그 데드존 방지).
+        double left = Math.Max(mon.Bounds.X, Math.Min(baseLeft + _toolbarOffset.X, mon.Bounds.X + mon.Bounds.Width - panelW));
+        double top = Math.Max(mon.Bounds.Y, Math.Min(baseTop + _toolbarOffset.Y, mon.Bounds.Y + mon.Bounds.Height - panelH));
+        _toolbarOffset = new PointD(left - baseLeft, top - baseTop);
         var bounds = new RectD(left, top, panelW, panelH);
+        _toolbarBounds = bounds;
         double cy = top + panelH / 2;
         double x = left + pad;
 
@@ -493,7 +507,7 @@ public sealed class OverlayCoordinator : IDisposable
         // 종료 버튼 — 마우스로 그리기 모드를 끌 수 있게(클릭 흡수 중에도 툴바는 처리됨).
         _toolbarCloseRect = new RectD(x, cy - closeD / 2, closeD, closeD);
 
-        string hint = $"{preview.DisplayName()} · 드래그하여 그리기 · ESC 종료";
+        string hint = $"{preview.DisplayName()} · 드래그하여 그리기 · 빈 곳 잡고 툴바 이동 · ESC 종료";
         return new ToolbarVisual(bounds, _activeColor, hint, toolItems, thickItems, colorItems, _toolbarCloseRect);
     }
 
@@ -666,6 +680,12 @@ public sealed class OverlayCoordinator : IDisposable
                         _settingsModel.RingColor = rc;
                         _keystrokes.ShowStatusNotification($"색 · {rc.Label()}", now);
                     }
+                    else if (_toolbarBounds.Contains(point))
+                    {
+                        // 툴바 배경(아이템 아닌 곳) 드래그 — 위치 이동 시작.
+                        _draggingToolbar = true;
+                        _toolbarDragLast = point;
+                    }
                     else
                         _drawing.StartShape(point, _modifiers, _activeColor); // stroke도 accent 따름(DESIGN.md)
                 }
@@ -699,6 +719,7 @@ public sealed class OverlayCoordinator : IDisposable
             if (_runtime.IsRadialMenuActive) return;
             if (button != MouseButton.Left) return;
             _leftDown = false;
+            if (_draggingToolbar) { _draggingToolbar = false; return; } // 툴바 이동이었으면 도형 처리 안 함
             if (_drawing.IsDrawingModeActive)
             {
                 _drawing.EndShape();
