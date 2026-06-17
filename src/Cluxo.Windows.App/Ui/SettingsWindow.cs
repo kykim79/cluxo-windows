@@ -7,6 +7,7 @@ using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Effects;
+using System.Windows.Shapes;
 using Cluxo.Core;
 using Cluxo.Core.Platform;
 using Cluxo.Windows.App.Update;
@@ -60,13 +61,130 @@ internal sealed class SettingsWindow : Window
         };
         foreach (var t in tabs) t.Margin = new Thickness(16, 6, 16, 16);
 
+        var kinds = new[] { "ring", "effects", "modes", "shortcuts", "general" };
         var host = new ContentControl { Content = tabs[0] };
-        var bar = Segmented(titles, 0, i => host.Content = tabs[i], big: true);
+        var bar = IconTabBar(titles, kinds, 0, i => host.Content = tabs[i]);
 
         var root = new StackPanel { Background = WindowBg };
-        root.Children.Add(new Border { Padding = new Thickness(16, 14, 16, 6), Child = bar });
+        root.Children.Add(new Border { Padding = new Thickness(10, 12, 10, 4), Child = bar });
         root.Children.Add(host);
         return root;
+    }
+
+    // ── 아이콘 탭바 (맥처럼 아이콘 + 라벨, 선택 시 강조) ─────────────
+    private static readonly Color AccentColor = Color.FromRgb(0x0A, 0x84, 0xFF);
+    private static readonly Color TabMutedColor = Color.FromRgb(0x80, 0x80, 0x88);
+    private static readonly Brush TabSelectedBg = Frozen(Color.FromArgb(28, 0x0A, 0x84, 0xFF));
+
+    private static FrameworkElement IconTabBar(string[] titles, string[] kinds, int selected, Action<int> onSelect)
+    {
+        var grid = new UniformGrid { Rows = 1, Columns = titles.Length };
+        var brushes = new SolidColorBrush[titles.Length];
+        var bgs = new Border[titles.Length];
+
+        void Select(int idx)
+        {
+            for (int i = 0; i < titles.Length; i++)
+            {
+                bool on = i == idx;
+                brushes[i].Color = on ? AccentColor : TabMutedColor;
+                bgs[i].Background = on ? TabSelectedBg : Brushes.Transparent;
+            }
+        }
+
+        for (int i = 0; i < titles.Length; i++)
+        {
+            int idx = i;
+            var brush = new SolidColorBrush(TabMutedColor);
+            brushes[i] = brush;
+            var stack = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center };
+            stack.Children.Add(TabIcon(kinds[i], brush));
+            stack.Children.Add(new TextBlock { Text = titles[i], FontSize = 11, FontWeight = FontWeights.SemiBold, Foreground = brush, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 3, 0, 0) });
+            var bg = new Border { Child = stack, CornerRadius = new CornerRadius(9), Padding = new Thickness(0, 7, 0, 6), Margin = new Thickness(2, 0, 2, 0), Background = Brushes.Transparent, Cursor = Cursors.Hand };
+            bg.MouseLeftButtonUp += (_, _) => { onSelect(idx); Select(idx); };
+            bgs[i] = bg;
+            grid.Children.Add(bg);
+        }
+        Select(selected);
+        return grid;
+    }
+
+    // 탭 벡터 아이콘 — 단일 brush(선택 시 색 변경) 사용. 22×20 캔버스.
+    private static FrameworkElement TabIcon(string kind, Brush b)
+    {
+        var c = new Canvas { Width = 22, Height = 20 };
+        void Ln(double x1, double y1, double x2, double y2, double w) => c.Children.Add(new Line { X1 = x1, Y1 = y1, X2 = x2, Y2 = y2, Stroke = b, StrokeThickness = w, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round });
+        void Dot(double x, double y, double r) { var e = new Ellipse { Width = r * 2, Height = r * 2, Fill = b }; Canvas.SetLeft(e, x - r); Canvas.SetTop(e, y - r); c.Children.Add(e); }
+        void Ring(double x, double y, double r, double w) { var e = new Ellipse { Width = r * 2, Height = r * 2, Stroke = b, StrokeThickness = w }; Canvas.SetLeft(e, x - r); Canvas.SetTop(e, y - r); c.Children.Add(e); }
+        const double cx = 11, cy = 10;
+        switch (kind)
+        {
+            case "ring": // 커서 링
+                Ring(cx, cy, 7, 2); Dot(cx, cy, 1.7);
+                break;
+            case "effects": // 반짝임
+                c.Children.Add(Star(cx - 1, cy - 1, 6.5, b));
+                c.Children.Add(Star(cx + 5, cy + 4, 3, b));
+                break;
+            case "modes": // 광선(burst)
+                for (int k = 0; k < 8; k++) { double a = k * Math.PI / 4; Ln(cx + Math.Cos(a) * 3.2, cy + Math.Sin(a) * 3.2, cx + Math.Cos(a) * 7.5, cy + Math.Sin(a) * 7.5, 1.8); }
+                Dot(cx, cy, 1.5);
+                break;
+            case "shortcuts": // 키보드
+            {
+                var rect = new Rectangle { Width = 18, Height = 12, RadiusX = 2.5, RadiusY = 2.5, Stroke = b, StrokeThickness = 1.6 };
+                Canvas.SetLeft(rect, 2); Canvas.SetTop(rect, 4); c.Children.Add(rect);
+                for (int col = -2; col <= 2; col++) Dot(cx + col * 3.2, cy - 1.6, 0.85);
+                var sb = new Rectangle { Width = 8, Height = 1.9, RadiusX = 0.9, RadiusY = 0.9, Fill = b };
+                Canvas.SetLeft(sb, cx - 4); Canvas.SetTop(sb, cy + 1.6); c.Children.Add(sb);
+                break;
+            }
+            case "general": // 톱니바퀴 — 채운 cog + 가운데 구멍
+                c.Children.Add(Gear(cx, cy, 7.6, 5.6, 2.4, 8, b));
+                break;
+        }
+        return c;
+    }
+
+    // 톱니바퀴 — 톱니(outer/inner 교대 점) + 가운데 구멍(EvenOdd).
+    private static Path Gear(double cx, double cy, double outer, double inner, double holeR, int teeth, Brush fill)
+    {
+        var sg = new StreamGeometry();
+        using (var ctx = sg.Open())
+        {
+            int n = teeth * 2;
+            for (int i = 0; i <= n; i++)
+            {
+                double r = (i % 2 == 0) ? outer : inner;
+                double a = i * Math.PI / teeth;
+                var p = new Point(cx + Math.Cos(a) * r, cy + Math.Sin(a) * r);
+                if (i == 0) ctx.BeginFigure(p, true, true); else ctx.LineTo(p, true, false);
+            }
+        }
+        sg.Freeze();
+        var grp = new GeometryGroup { FillRule = FillRule.EvenOdd };
+        grp.Children.Add(sg);
+        grp.Children.Add(new EllipseGeometry(new Point(cx, cy), holeR, holeR));
+        grp.Freeze();
+        return new Path { Data = grp, Fill = fill };
+    }
+
+    private static Path Star(double cx, double cy, double r, Brush fill)
+    {
+        var g = new StreamGeometry();
+        using (var ctx = g.Open())
+        {
+            ctx.BeginFigure(new Point(cx, cy - r), true, true);
+            ctx.LineTo(new Point(cx + r * 0.28, cy - r * 0.28), true, false);
+            ctx.LineTo(new Point(cx + r, cy), true, false);
+            ctx.LineTo(new Point(cx + r * 0.28, cy + r * 0.28), true, false);
+            ctx.LineTo(new Point(cx, cy + r), true, false);
+            ctx.LineTo(new Point(cx - r * 0.28, cy + r * 0.28), true, false);
+            ctx.LineTo(new Point(cx - r, cy), true, false);
+            ctx.LineTo(new Point(cx - r * 0.28, cy - r * 0.28), true, false);
+        }
+        g.Freeze();
+        return new Path { Data = g, Fill = fill };
     }
 
     // ── 탭 ──────────────────────────────────────────────────────
