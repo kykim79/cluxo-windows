@@ -866,16 +866,28 @@ internal sealed class OverlayElement : FrameworkElement
     {
         if (string.IsNullOrEmpty(f.Keystroke)) return;
         double ppd = _monitor.DpiScale <= 0 ? 1.0 : _monitor.DpiScale;
+        const double fontSize = 30; // 맥 KeystrokeDisplayView와 동일 — 큰 글씨로 시인성↑(전엔 13pt)
         var ft = new FormattedText(f.Keystroke, CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
             new Typeface(new FontFamily("Segoe UI"), FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal),
-            (double)Tokens.Text.Label.Size, MakeBrush(Rgba.FromWhite(0.95), 1.0), ppd);
+            fontSize, MakeBrush(Rgba.FromWhite(1.0), 1.0), ppd);
 
-        double padX = Tokens.Spacing.Lg, padY = Tokens.Spacing.Sm;
+        const double padX = 26, padY = 13;
         double w = ft.Width + padX * 2, h = ft.Height + padY * 2;
         double x = (ActualWidth - w) / 2;
-        double y = ActualHeight - h - 64; // 하단에서 살짝 위
+        double y = ActualHeight - h - 72; // 하단에서 살짝 위
         var rect = new Rect(x, y, w, h);
-        dc.DrawRoundedRectangle(MakeBrush(Tokens.Surface.Panel, 1.0), null, rect, Tokens.Radius.Lg, Tokens.Radius.Lg);
+        double r = Tokens.Radius.Xl;
+
+        // 부드러운 드롭섀도(맥 shadow radius 12 근사) — 바깥으로 커지는 반투명 검정 다중 레이어, 아래로 살짝.
+        for (int i = 4; i >= 1; i--)
+        {
+            double g = i * 2.5;
+            var sr = new Rect(x - g, y - g + 4, w + g * 2, h + g * 2);
+            dc.DrawRoundedRectangle(MakeBrush(Rgba.FromBlack(0.10), 1.0), null, sr, r + g, r + g);
+        }
+        // 패널(조금 더 진하게) + 옅은 흰 테두리(크리스프)
+        dc.DrawRoundedRectangle(MakeBrush(Rgba.FromBlack(0.82), 1.0), null, rect, r, r);
+        dc.DrawRoundedRectangle(null, new Pen(MakeBrush(Rgba.FromWhite(0.14), 1.0), 1), rect, r, r);
         dc.DrawText(ft, new Point(x + padX, y + padY));
     }
 
