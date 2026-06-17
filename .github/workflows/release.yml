@@ -1,0 +1,62 @@
+name: Release
+
+# v* 태그를 push하면 self-contained 단일 exe를 빌드·(시크릿 있으면)서명하고 GitHub 릴리스를 만든다.
+#   git tag v1.0.0 && git push origin v1.0.0
+# 시크릿(선택): SIGN_PFX_BASE64(PFX base64), SIGN_PFX_PASSWORD. 없으면 미서명으로 릴리스(SmartScreen 경고).
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '릴리스 태그 (예: v1.0.0) — 수동 실행 시'
+        required: true
+
+permissions:
+  contents: write   # gh release create
+
+jobs:
+  release:
+    runs-on: windows-latest
+    env:
+      PFX_B64: ${{ secrets.SIGN_PFX_BASE64 }}
+      PFX_PW: ${{ secrets.SIGN_PFX_PASSWORD }}
+      VERSION: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Build + Test (Release)
+        run: |
+          dotnet build Cluxo.Windows.sln --configuration Release
+          dotnet test Cluxo.Windows.sln --configuration Release --no-build
+
+      - name: Publish (self-contained 단일 exe, win-x64)
+        shell: pwsh
+        run: pwsh scripts/publish.ps1 -Rid win-x64
+
+      - name: Code sign (인증서 시크릿 있을 때만)
+        if: env.PFX_B64 != ''
+        shell: pwsh
+        run: |
+          [IO.File]::WriteAllBytes("$env:RUNNER_TEMP/cert.pfx", [Convert]::FromBase64String($env:PFX_B64))
+          pwsh scripts/sign.ps1 -File publish/win-x64/Cluxo.Windows.App.exe -PfxPath "$env:RUNNER_TEMP/cert.pfx" -PfxPassword $env:PFX_PW
+          Remove-Item "$env:RUNNER_TEMP/cert.pfx" -Force
+
+      - name: 버전명으로 산출물 이름 변경
+        shell: pwsh
+        run: |
+          Copy-Item publish/win-x64/Cluxo.Windows.App.exe "publish/win-x64/Cluxo-$env:VERSION-win-x64.exe"
+
+      - name: GitHub 릴리스 생성 + exe 첨부
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create $env:VERSION "publish/win-x64/Cluxo-$env:VERSION-win-x64.exe" `
+            --title "Cluxo $env:VERSION" --generate-notes
