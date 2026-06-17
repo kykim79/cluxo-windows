@@ -1,4 +1,5 @@
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -419,36 +420,114 @@ internal sealed class SettingsWindow : Window
         return Segmented(values.Select(labelOf).ToArray(), Array.IndexOf(values, current), i => onChange(values[i]));
     }
 
-    // ── 색 스와치 ───────────────────────────────────────────────
+    // ── 색 스와치 (+ 흰색 가시성 외곽선 + 커스텀 색 선택기) ───────
+    private static readonly Brush SwatchHairline = Frozen(Color.FromRgb(0xCF, 0xCF, 0xD6));
+
+    private static Brush RainbowBrush()
+    {
+        var b = new LinearGradientBrush { StartPoint = new Point(0, 0), EndPoint = new Point(1, 1) };
+        b.GradientStops.Add(new GradientStop(Color.FromRgb(0xFF, 0x3B, 0x30), 0.00));
+        b.GradientStops.Add(new GradientStop(Color.FromRgb(0xFF, 0xCC, 0x00), 0.25));
+        b.GradientStops.Add(new GradientStop(Color.FromRgb(0x34, 0xC7, 0x59), 0.50));
+        b.GradientStops.Add(new GradientStop(Color.FromRgb(0x00, 0xC7, 0xE0), 0.70));
+        b.GradientStops.Add(new GradientStop(Color.FromRgb(0xAF, 0x52, 0xDE), 1.00));
+        b.Freeze();
+        return b;
+    }
+
+    private static Border SwatchRing(Brush dotBg, string tip)
+    {
+        var dot = new Border
+        {
+            Width = 24, Height = 24, CornerRadius = new CornerRadius(12), Background = dotBg,
+            BorderBrush = SwatchHairline, BorderThickness = new Thickness(1), // 밝은 색(흰색) 가시성
+        };
+        return new Border
+        {
+            Width = 34, Height = 34, CornerRadius = new CornerRadius(17), BorderThickness = new Thickness(2.5),
+            BorderBrush = Brushes.Transparent, Background = Brushes.Transparent, Child = dot,
+            Margin = new Thickness(1), Cursor = Cursors.Hand, ToolTip = tip,
+        };
+    }
+
     private static FrameworkElement ColorSwatches(CursorSettings s)
     {
         var wrap = new WrapPanel();
         var colors = Enum.GetValues<RingColor>().Where(c => c != RingColor.Custom).ToArray();
         var rings = new Border[colors.Length];
+        Border customRing = SwatchRing(RainbowBrush(), "커스텀 색 선택…");
+        var customDot = (Border)customRing.Child;
 
         void Apply(RingColor sel)
         {
             for (int i = 0; i < colors.Length; i++)
                 rings[i].BorderBrush = colors[i] == sel ? Accent : Brushes.Transparent;
+            customRing.BorderBrush = sel == RingColor.Custom ? Accent : Brushes.Transparent;
+            // 커스텀 선택 시 도트를 고른 색으로, 아니면 무지개(선택 안내).
+            var cr = s.CustomRingColor;
+            customDot.Background = sel == RingColor.Custom ? (Brush)Frozen(Color.FromRgb(cr.R, cr.G, cr.B)) : RainbowBrush();
         }
 
         for (int i = 0; i < colors.Length; i++)
         {
             var color = colors[i];
             var rgba = color.Color();
-            var dot = new Border { Width = 24, Height = 24, CornerRadius = new CornerRadius(12), Background = Frozen(Color.FromRgb(rgba.R, rgba.G, rgba.B)) };
-            var ring = new Border
-            {
-                Width = 34, Height = 34, CornerRadius = new CornerRadius(17), BorderThickness = new Thickness(2.5),
-                BorderBrush = Brushes.Transparent, Background = Brushes.Transparent, Child = dot,
-                Margin = new Thickness(1), Cursor = Cursors.Hand, ToolTip = color.Label(),
-            };
+            var ring = SwatchRing(Frozen(Color.FromRgb(rgba.R, rgba.G, rgba.B)), color.Label());
             ring.MouseLeftButtonUp += (_, _) => { s.RingColor = color; Apply(color); };
             rings[i] = ring;
             wrap.Children.Add(ring);
         }
+
+        // 커스텀 색 — 클릭 시 Windows 색 선택기(comdlg32 ChooseColor).
+        customRing.MouseLeftButtonUp += (_, _) =>
+        {
+            if (TryPickColor(s.CustomRingColor, out var picked))
+            {
+                s.CustomRingColor = picked;
+                s.RingColor = RingColor.Custom;
+                Apply(RingColor.Custom);
+            }
+        };
+        wrap.Children.Add(customRing);
+
         Apply(s.RingColor);
         return wrap;
+    }
+
+    // ── Win32 색 선택기 (comdlg32 ChooseColor) — WinForms 의존 없이 표준 색 다이얼로그 ──
+    [StructLayout(LayoutKind.Sequential)]
+    private struct CHOOSECOLOR
+    {
+        public int lStructSize;
+        public IntPtr hwndOwner, hInstance;
+        public int rgbResult;       // COLORREF 0x00BBGGRR
+        public IntPtr lpCustColors; // 16개 COLORREF 배열 포인터
+        public int Flags;
+        public IntPtr lCustData, lpfnHook, lpTemplateName;
+    }
+    [DllImport("comdlg32.dll", SetLastError = true)] private static extern bool ChooseColor(ref CHOOSECOLOR cc);
+    private const int CC_RGBINIT = 0x1, CC_FULLOPEN = 0x2, CC_ANYCOLOR = 0x100;
+    private static readonly int[] s_customColors = new int[16]; // 다이얼로그 사용자 정의 색 보관
+
+    private static bool TryPickColor(Rgba initial, out Rgba result)
+    {
+        result = initial;
+        var handle = GCHandle.Alloc(s_customColors, GCHandleType.Pinned);
+        try
+        {
+            var cc = new CHOOSECOLOR
+            {
+                lStructSize = Marshal.SizeOf<CHOOSECOLOR>(),
+                rgbResult = initial.R | (initial.G << 8) | (initial.B << 16),
+                lpCustColors = handle.AddrOfPinnedObject(),
+                Flags = CC_RGBINIT | CC_FULLOPEN | CC_ANYCOLOR,
+            };
+            if (!ChooseColor(ref cc)) return false; // 취소
+            int c = cc.rgbResult;
+            result = new Rgba((byte)(c & 0xFF), (byte)((c >> 8) & 0xFF), (byte)((c >> 16) & 0xFF));
+            return true;
+        }
+        finally { handle.Free(); }
     }
 
     // ── 토글 스위치 ─────────────────────────────────────────────
