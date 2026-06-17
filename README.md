@@ -1,94 +1,68 @@
 # Cluxo for Windows
 
-macOS Cluxo(커서 강조 발표 도구)의 **네이티브 Windows 재구현**. 회사 코브랜딩 홍보용 배포를 목표로 한 별도 제품 — 오픈소스 Mac repo와 분리해 IP·라이선스를 깨끗하게 유지한다.
+발표·강의·화면 녹화에서 **마우스 커서를 눈에 띄게** 강조해 주는 도구. macOS [Cluxo](https://github.com/kykim79/Cluxo)의 네이티브 Windows 재구현입니다.
 
-설계·전략 전체: `~/.gstack/projects/kykim79-Cluxo/ktoy-main-design-20260616-145510.md`
-(office-hours → plan-eng-review → plan-ceo-review 통과, 2026-06-16)
+커서 둘레에 강조 링을 그리고, 클릭·스크롤·드래그에 시각 효과를 더하며, 스포트라이트·돋보기·키 입력 표시·화면 주석(그리기) 등 발표에 필요한 기능을 트레이에서 조용히 제공합니다.
 
-## 아키텍처 (요약)
+> 상태: 활발히 개발 중. 최신 빌드는 [Releases](https://github.com/kykim79/cluxo-windows/releases)에서 받을 수 있습니다.
 
-- **언어/스택**: C# (.NET 8) + Win32 P/Invoke + Vortice.Windows(로우레벨 Direct2D) 예정.
-- **계층**:
-  - `Cluxo.Core` — 플랫폼 무관 순수 로직 (xUnit 100% 목표). Mac의 static 순수함수 패턴 이식. 훗날 공유 코어(Approach C) 씨앗.
-  - Input / Render / Shell — 네이티브 Windows 계층 (예정).
-- **v1 스코프**: 커서 강조 링·클릭 스포트라이트·키스트로크 오버레이·라디얼 메뉴·그리기/주석 모드·흔들기로 찾기·코브랜딩. 제외: 트랙패드 제스처(강제), 돋보기(v1.1).
+## 주요 기능
 
-## 빌드 / 테스트
+- **커서 강조 링** — 색·모양(원/사각/마름모/육각)·크기·투명도·이중 링·채우기·호흡(맥박처럼 천천히 스케일)
+- **클릭/스크롤/드래그 효과** — 클릭 리플, 더블클릭, 스크롤 화살표, 코멧 꼬리, 정지 펄스, 흔들기로 찾기
+- **스포트라이트** — 커서 주변만 남기고 화면을 어둡게
+- **돋보기** — 커서 주변 실시간 확대 (Windows Magnification API)
+- **키 입력 표시** — 누른 단축키를 화면 하단에 크게 자막처럼
+- **라디얼 메뉴** — 가운데 버튼(또는 `Ctrl+Alt+.`)으로 빠르게 색·모양·효과 전환
+- **그리기/주석 모드** — 화면 위에 펜·도형·화살표·형광펜으로 주석 (이동 가능한 플로팅 툴바)
+- **좌표/각도 표시**, **커스텀 색 선택**
+- **발표 자동 감지** — Zoom·OBS·Teams·PowerPoint 등이 켜지면 자동 활성화, 낯선 외장 모니터 연결 시 키 입력 표시 자동 ON
+- **트레이 활성/비활성 토글**, **로그인 시 자동 실행**, **다국어**(시스템/한국어/English)
+- **자동 업데이트 확인**
 
-```bash
-dotnet build      # 솔루션 빌드 (Cluxo.Core, 맥/윈도우 공통)
-dotnet test       # Cluxo.Core 단위 테스트
+## 설치
+
+[Releases](https://github.com/kykim79/cluxo-windows/releases)에서 둘 중 하나를 받으세요 (Windows 10/11):
+
+- **`Cluxo-Setup-x.y.z.exe`** — 설치 프로그램 (Program Files 설치 + 시작 메뉴 + 제거 프로그램)
+- **`Cluxo-x.y.z-win-x64.exe`** — 무설치 포터블 단일 실행 파일
+
+> 아직 코드 서명이 없어 첫 실행 시 SmartScreen 경고가 뜰 수 있습니다 — **추가 정보 → 실행**으로 진행하세요.
+
+## 단축키
+
+모든 단축키는 `Ctrl+Alt` 조합입니다 (환경설정 → 단축키에서 일부 변경 가능).
+
+| 단축키 | 기능 |
+|--------|------|
+| `Ctrl+Alt+.` (또는 가운데 버튼) | 라디얼 메뉴 |
+| `Ctrl+Alt+D` | 그리기 모드 |
+| `Ctrl+Alt+S` | 스포트라이트 |
+| `Ctrl+Alt+M` | 돋보기 |
+| `Ctrl+Alt+K` | 키 입력 표시 |
+| `Ctrl+Alt+I` | 좌표/각도 표시 |
+| `Ctrl+Alt+C` / `H` | 색 / 모양 순환 |
+| `Ctrl+Alt+1`~`7` | 색 직접 선택 |
+
+> 참고: 일부 원격 데스크톱·VM 클라이언트는 `Ctrl+Alt+<글자>` 조합을 가로채 단축키가 안 먹을 수 있습니다. 그 경우 라디얼 메뉴(가운데 버튼)로 모든 기능을 쓸 수 있습니다.
+
+## 소스에서 빌드
+
+[.NET 8 SDK](https://dotnet.microsoft.com/download) 필요 (Windows).
+
+```powershell
+dotnet build Cluxo.Windows.sln -c Release   # 빌드
+dotnet test  Cluxo.Windows.sln              # 단위 테스트
+pwsh scripts/publish.ps1                     # 배포용 self-contained 단일 exe 생성
 ```
 
-네이티브 Windows 개발(Parallels VM 셋업·앱 프로젝트·인터페이스 구현): **[docs/WINDOWS-SETUP.md](docs/WINDOWS-SETUP.md)**
+## 아키텍처
 
-**CI**: `core-ci`(ubuntu, 매 push에 Core 266 테스트 게이트) + `windows-app`(windows-latest, 네이티브 앱 생성 후 자동·수동). `.github/workflows/`
+- **`Cluxo.Core`** — 플랫폼 무관 순수 로직(효과·설정·라디얼·그리기 상태 등)을 단위 테스트와 함께 보유. macOS 버전의 순수 함수 패턴을 C#으로 이식.
+- **네이티브 Windows 계층** — 입력(Win32 저수준 후킹·전역 단축키), 렌더(투명 오버레이 윈도우), Shell(트레이·모니터·설정)이 `Cluxo.Core.Platform` 인터페이스를 구현하고 `OverlayCoordinator`가 배선.
 
-## Cluxo.Core 이식 진행 (Mac → C#)
+계층별 상세 설계는 [`docs/`](docs/)를 참고하세요.
 
-| 모듈 | 상태 | 비고 |
-|------|------|------|
-| ShakeState | ✅ 이식·테스트(17) | 시간 주입, 축별 독립 추적, 0.5초 dedup |
-| DragAngleLabel / DragAngleAccumulator | ✅ 이식·테스트(28) | ±π wrapping, 8방향 화살표(away-from-zero 반올림) |
-| RadialHitTest | ✅ 이식·테스트(11) | 거리/각도 → sector/sub/subSub, lock 유지 |
-| KeyFormat | ✅ 이식·테스트(13) | 게이트(Ctrl/Alt/Win 필수)·순서·특수키 불변식 보존. 글리프는 Windows 관례(디자인 리뷰서 확정), VK 매핑은 플랫폼 계층 |
-| DrawingState | ✅ 이식·테스트(48) | 7개 도구·모디파이어 매핑(Cmd→Ctrl/Opt→Alt)·두께 단계·undo·툴바 hit-test. onboarding은 UI 계층 |
-| JsonSettingsStore (Persisted) | ✅ 이식·테스트(7) | %APPDATA% JSON 영구화. 기본값/손상 fallback·라운드트립. 파일IO·디바운스는 플랫폼 계층 |
-| BrandingConfig | ✅ 이식·테스트(11) | 코브랜딩 런타임 주입 + HMAC 무결성(변조/미서명 → 순정 fallback). 외부보이스 P1(T3) |
-| Tokens (DESIGN.md 전체) | ✅ 이식·테스트(19) | Surface/Stroke/Motion/Radial/Radius/Spacing/Drawing/Text 전체. SwiftUI 타입→플랫폼 무관 데이터 |
-| EffectsState | ✅ 이식·테스트(15) | 클릭/스크롤/흔들기/정지펄스/트레일 큐. Task.sleep→시간주입 Prune(now)로 대체(결정적). 트랙패드/클립보드 제외 |
-| KeystrokeOverlayState | ✅ 이식·테스트(6) | 키스트로크/상태알림 표시 + 자동 숨김. Task.sleep→시간주입 Tick(now) |
-| CursorSettings (+값 enum, RadialLabel) | ✅ 이식·테스트(15) | JsonSettingsStore 백업 타입 접근자(Swift 키·기본값). 8개 값 enum, effectiveRingColor, 신뢰 모니터, contentSpan/estLabelWidth. macOS 키코드·RadialMenuItem 트리는 제외(별도) |
-| CursorRuntimeState | ✅ 이식·테스트(9) | 위치·활성 토글·라디얼 선택·드래그 모션. 속도 EMA, anchored line 임계(거리100/시간1s), DragAngleAccumulator 재사용. 스프링 애니메이션·magnifier는 렌더/v1.1 |
-| RadialMenu (RadialMenuItem 트리) | ✅ 이식·테스트(18) | 8 sector 트리(subItems·라벨·desc, 정적), currentValue/isSubCurrent/isSubSubCurrent 상태 로직, SubSpan/SubSubSpan. RadialHitTest 구동. SF Symbol 아이콘은 렌더 계층 |
-| RadialMenuController | ✅ 이식·테스트(11) | hold 상호작용: Open(중심)/Update(선택추적+marking reveal 0.15s)/Close(액션 실행→설정·런타임 변경). 시간 주입 |
+## 라이선스
 
-추가 Core 타입: `PointD`/`RectD`/`Rgba`(+opacity 팩토리·needsDarkText), `Spring`/`Ease`/`FontToken`(Visuals), `KeyModifiers`/`SpecialKey`.
-
-**Cluxo.Core v1 순수 로직 + 디자인 토큰 이식 완료 — 266 tests green.** (GestureClassifier는 설계대로 제외: Windows에 raw 터치 입력원 없음.)
-
-## 네이티브 계층 경계 (`Cluxo.Core.Platform`)
-
-Core(순수 로직)와 네이티브 Windows 구현 사이 계약. 네이티브가 구현, Core/코디네이터가 소비.
-
-```
-[후킹 스레드]                  [코디네이터]              [렌더 스레드 / vsync]
-IMouseHook(클릭·스크롤만) ─▶  Core 상태 갱신     ICursorPositionSource(이동=프레임 샘플)
-IKeyboardHook ───────────▶  (DrawingState,           │
-IHotkeyRegistrar ────────▶   ShakeState …)  ──▶ OverlayFrame(불변) ─▶ IOverlayRenderer
-IForegroundAppMonitor ───▶                            (모니터별 Direct2D)
-IClock.NowSeconds ───────▶
-Shell: ISettingsStore · IBrandingProvider · ILaunchAtLogin · ITrayIcon · IMonitorProvider
-```
-
-- **스레드 규약**: 입력 콜백 경량(WH_MOUSE_LL timeout 회피) → Core 갱신만. 렌더는 별 스레드에서 vsync마다 위치 샘플 + 불변 `OverlayFrame` 수신(공유 가변 상태 없음).
-- **하이브리드 입력**(설계 발견1): 이동은 후킹 안 함, 클릭/스크롤만 `IMouseHook`. 위치는 `ICursorPositionSource` 폴링.
-- **T2 critical gap**: `IMouseHook.HookRemoved` — 후킹 제거 감지 → 재설치 + 알림.
-- 인터페이스는 테스트 더블로 시ams 조립 검증(PlatformTests 8): Clock→ShakeState, MouseHook→DrawingState, OverlayFrame 전달.
-
-## 코디네이터 (`OverlayCoordinator`)
-
-Core 상태 + 플랫폼 인터페이스를 배선하는 중앙 조정자 (Mac `AppDelegate` 대응). 인터페이스에만 의존 → Windows 없이 맥에서 전체 흐름 테스트(OverlayCoordinatorTests 9, 전부 fake 하니스).
-
-- **렌더 루프 미보유**: 플랫폼이 vsync마다 `RenderFrame()` 호출 → 테스트 가능.
-- **스레딩 규약 구현**: 입력 콜백은 `_gate` 락 안 Core 갱신만, `RenderFrame`은 락 안 스냅샷 → 락 밖 렌더(GPU 작업 중 락 X).
-- **하이브리드 입력 행사**: 그리기 드래그 경로는 후킹이 아니라 `RenderFrame`의 프레임 샘플 위치를 따라간다.
-- 배선: ⌃⌥D 토글, 좌클릭 그리기 start/end, ESC clear, `[ ]` 두께+영구화, Ctrl+Z undo, 모니터 변경 시 렌더러 재구성, 후킹 분실(T2) → `MouseHookLost`, 종료 시 설정 flush.
-- **효과 배선**(EffectsState): 좌/우클릭 + 더블클릭 감지 → `AddClick`, 스크롤 → `AddScroll`(모니터 영역), 흔들기 감지 → `AddShake`, 매 프레임 트레일/드래그트레일 + `Prune(now)`. 그리기 모드에선 효과 억제. `OverlayFrame`에 모니터별 필터된 `OverlayEffects` 포함.
-- **키스트로크 배선**(KeystrokeOverlayState): `OnKeyPressed` → `KeyFormat.Format`(게이트로 단순 타이핑 제외) → `ShowKeystroke`, 그리기 토글 → `ShowStatusNotification`, `RenderFrame`에서 `Tick(now)` → `OverlayFrame.Keystroke`.
-- **설정 배선**(CursorSettings): 링 색·크기·투명도(`EffectiveRingColor`/`RingSize`/`RingOpacity`), 그리기 stroke=accent, `AnimationSpeed`→효과 수명, `KeystrokeTimeout`, `ShakeSensitivity`→`ShakeState`. 핫패스 회피 위해 설정을 **캐시**하고 `Changed` 시에만 갱신(+`Save` 디바운스).
-- **런타임 배선**(CursorRuntimeState): 커서 위치 추적, 비-그리기 좌클릭 드래그 → `StartDrag`/`EndDrag` + 프레임 델타로 속도(EMA)·각도·anchored line(거리/시간), `OverlayFrame.Drag`(커서 모니터만). ⌃⌥I → inspector(좌표) 토글.
-- **라디얼 배선**(RadialMenuController): `IRadialTrigger`(chord hold) Opened → `Open`(커서=중심), `RenderFrame`에서 `Update`(선택 추적), Closed → `Close`(선택 실행). 라디얼 중 일반 인터랙션 억제. `OverlayFrame.Radial`(중심 모니터만).
-- TODO(상태 이식 시 연결): 발표앱 감지 동작, 정지펄스 트리거(idleTimeout).
-
-**현재 266 tests green.** 다음 단계는 플랫폼 인터페이스의 **네이티브 구현**(Input/Render/Shell)으로, Windows 실행 환경(Parallels VM/미니PC)이 필요.
-
-## 배포
-
-고객사 환경에서 **설치·실행 가능 확인됨**(현장 판단). 외부 리뷰가 우려했던 "기업 IT가 마우스 훅 앱을 차단" 리스크(T4)는 해소.
-남은 건 게이트가 아니라 **패키징 선택**: 직접 배포(서명된 .exe/MSI) 우선, 코드사이닝(OV/EV)으로 SmartScreen 마찰 제거, Store는 추후.
-
-- 패키징·퍼블리시·코드사이닝: **[docs/PACKAGING.md](docs/PACKAGING.md)** (`scripts/publish.ps1`·`scripts/sign.ps1`)
-- 출시 전 실하드웨어 QA(멀티모니터·DPI·후킹·녹화): **[docs/QA-CHECKLIST.md](docs/QA-CHECKLIST.md)** (설계 T10)
-
-> **렌더 백엔드 메모**: 현재 오버레이는 WPF 투명 윈도우 **스톱갭**(이 개발 환경에서 Vortice NuGet 복원 불가). 설계의 DComp+Direct2D는 네트워크 되는 환경에서 `IOverlayRenderer` 구현만 교체.
+라이선스 미정. 추가 예정입니다.
