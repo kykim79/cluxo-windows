@@ -51,6 +51,8 @@ public sealed class CursorSettings
     public bool IsCometTailEnabled { get => Get("isCometTailEnabled", false); set => Set("isCometTailEnabled", value); }
     public bool IsDragAngleLabelEnabled { get => Get("isDragAngleLabelEnabled", false); set => Set("isDragAngleLabelEnabled", value); }
     public bool IsIdlePulseEnabled { get => Get("isIdlePulseEnabled", true); set => Set("isIdlePulseEnabled", value); }
+    /// <summary>호흡 — 링이 맥박처럼 천천히 커졌다 작아짐(0.94↔1.08, 3.8초 주기). 드래그 중엔 제외. 맥 대응.</summary>
+    public bool IsBreathingEnabled { get => Get("isBreathingEnabled", true); set => Set("isBreathingEnabled", value); }
     public bool IsScrollIndicatorEnabled { get => Get("scrollIndicator", true); set => Set("scrollIndicator", value); }
     public bool IsShakeEnabled { get => Get("isShakeEnabled", true); set => Set("isShakeEnabled", value); }
     public ShakeSensitivity ShakeSensitivity { get => Get("shakeSensitivity", ShakeSensitivity.Normal); set => Set("shakeSensitivity", value); }

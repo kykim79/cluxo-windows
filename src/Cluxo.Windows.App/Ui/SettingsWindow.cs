@@ -94,6 +94,7 @@ internal sealed class SettingsWindow : Window
         p.Children.Add(Card(("애니메이션 속도", SegEnum(s.AnimationSpeed, v => s.AnimationSpeed = v, v => v.Label()))));
         p.Children.Add(Card(
             ("글로우", Switch(s.IsGlowEnabled, v => s.IsGlowEnabled = v)),
+            ("호흡", Switch(s.IsBreathingEnabled, v => s.IsBreathingEnabled = v)),
             ("정지 펄스", Switch(s.IsIdlePulseEnabled, v => s.IsIdlePulseEnabled = v)),
             ("커서 트레일", Switch(s.IsTrailEnabled, v => s.IsTrailEnabled = v)),
             ("코멧 꼬리", Switch(s.IsCometTailEnabled, v => s.IsCometTailEnabled = v))));

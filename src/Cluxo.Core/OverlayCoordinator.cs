@@ -100,6 +100,11 @@ public sealed class OverlayCoordinator : IDisposable
     private double _ringFade = 1.0;
     private const double RingFadeDuration = 0.5; // 페이드 시간(초)
 
+    // 호흡 — 링이 맥박처럼 천천히 스케일(맥 breathingScale). 드래그 중엔 미적용.
+    private bool _breathingEnabled = true;
+    private double _breathingScale = 1.0;
+    private const double BreathPeriod = 3.8; // 한 호흡 주기(초)
+
     private const string LineWidthKey = "drawing.lineWidth";
     private const double DoubleClickWindow = 0.4;
     private const double DoubleClickRadius = 6;
@@ -221,6 +226,9 @@ public sealed class OverlayCoordinator : IDisposable
             { _lastMoveTime = now; _lastMovePos = pos; }
             _ringFade = _ringHideSeconds <= 0 ? 1.0
                 : Math.Max(0.0, 1.0 - Math.Max(0.0, (now - _lastMoveTime) - _ringHideSeconds) / RingFadeDuration);
+
+            // 호흡 — 0.94↔1.08 사인. 드래그 게이트는 링 생성 시 적용.
+            _breathingScale = _breathingEnabled ? 1.01 + 0.07 * Math.Sin(now * (2 * Math.PI / BreathPeriod)) : 1.0;
 
             // 비활성화(트레이 토글) — 아무것도 그리지 않는다(맥 비활성화 대응). 효과 처리도 건너뜀.
             if (!_active)
@@ -367,7 +375,7 @@ public sealed class OverlayCoordinator : IDisposable
             }
             RingVisual? ring = cursorHere is null
                 ? null
-                : new RingVisual(_activeColor, _ringRadius, Scale: 1.0, _ringOpacity * _ringFade,
+                : new RingVisual(_activeColor, _ringRadius, Scale: _runtime.IsDragging ? 1.0 : _breathingScale, _ringOpacity * _ringFade,
                     _ringShape, _ringBorderWidth, _ringDashed, _glowEnabled,
                     _hasInnerRing, _ringFillEnabled, sx, sy, sAngle);
             // 효과는 이 모니터 영역 것만 (Mac의 per-screen 필터). TODO: 프레임당 Where/ToArray 최적화
@@ -536,6 +544,7 @@ public sealed class OverlayCoordinator : IDisposable
             _anchoredLineEnabled = _settingsModel.IsAnchoredLineEnabled;
             _glowEnabled = _settingsModel.IsGlowEnabled;
             _idlePulseEnabled = _settingsModel.IsIdlePulseEnabled;
+            _breathingEnabled = _settingsModel.IsBreathingEnabled;
             _dragAngleLabelEnabled = _settingsModel.IsDragAngleLabelEnabled;
             _idleTimeout = _settingsModel.IdleTimeout;
             _ringHideSeconds = _settingsModel.RingHideSeconds;
