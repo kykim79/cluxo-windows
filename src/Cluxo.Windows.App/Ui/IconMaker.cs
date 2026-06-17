@@ -46,30 +46,31 @@ internal static class IconMaker
 
     private static byte[] RenderPng(int size)
     {
-        var cyan = Color.FromRgb(0, 230, 255);
-        double c = size / 2.0;
-        double r = size * 0.34;
-        double t = Math.Max(1.5, size * 0.14);
+        double sz = size;
+        double c = sz / 2.0;
 
         var dv = new DrawingVisual();
         using (var dc = dv.RenderOpen())
         {
-            // 큰 크기에선 은은한 글로우
-            if (size >= 48)
-            {
-                var glow = new RadialGradientBrush
-                {
-                    GradientOrigin = new Point(0.5, 0.5), Center = new Point(0.5, 0.5), RadiusX = 0.5, RadiusY = 0.5,
-                };
-                glow.GradientStops.Add(new GradientStop(Color.FromArgb(70, cyan.R, cyan.G, cyan.B), 0));
-                glow.GradientStops.Add(new GradientStop(Color.FromArgb(0, cyan.R, cyan.G, cyan.B), 1));
-                glow.Freeze();
-                dc.DrawEllipse(glow, null, new Point(c, c), c, c);
-            }
-            var pen = new Pen(new SolidColorBrush(cyan), t) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round };
+            // 배경 타일 — 둥근 사각형 + 시안→블루 대각 그라디언트. 꽉 찬 컬러라 밝은/어두운 작업표시줄·
+            // 트레이 어디서나 또렷한 실루엣. (투명 링은 잘 안 보여서 교체)
+            double pad = Math.Max(0.5, sz * 0.055);
+            var rect = new Rect(pad, pad, sz - 2 * pad, sz - 2 * pad);
+            double corner = (sz - 2 * pad) * 0.27;
+            var bg = new LinearGradientBrush(
+                Color.FromRgb(0x10, 0xC8, 0xEC), Color.FromRgb(0x16, 0x57, 0xE6),
+                new Point(0, 0), new Point(1, 1));
+            bg.Freeze();
+            dc.DrawRoundedRectangle(bg, null, rect, corner, corner);
+
+            // 흰 커서 링 + 중심 점 — 컬러 타일 위에서 고대비.
+            double r = sz * 0.26;
+            double t = Math.Max(1.6, sz * 0.105);
+            var white = new SolidColorBrush(Colors.White); white.Freeze();
+            var pen = new Pen(white, t) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round };
             pen.Freeze();
             dc.DrawEllipse(null, pen, new Point(c, c), r, r);
-            dc.DrawEllipse(new SolidColorBrush(cyan), null, new Point(c, c), Math.Max(1.0, size * 0.06), Math.Max(1.0, size * 0.06));
+            dc.DrawEllipse(white, null, new Point(c, c), Math.Max(1.0, sz * 0.055), Math.Max(1.0, sz * 0.055));
         }
 
         var rtb = new RenderTargetBitmap(size, size, 96, 96, PixelFormats.Pbgra32);
