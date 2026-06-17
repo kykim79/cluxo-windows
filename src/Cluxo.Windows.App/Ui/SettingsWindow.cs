@@ -2,6 +2,7 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Effects;
@@ -130,7 +131,7 @@ internal sealed class SettingsWindow : Window
             ("스포트라이트", KeyRecorder(s.HotkeySpotlight, v => s.HotkeySpotlight = v, cap)),
             ("돋보기", KeyRecorder(s.HotkeyMagnifier, v => s.HotkeyMagnifier = v, cap)),
             ("키 입력 표시", KeyRecorder(s.HotkeyKeystroke, v => s.HotkeyKeystroke = v, cap))));
-        p.Children.Add(Note("모든 단축키는 Ctrl+Alt 조합. 항목을 누르고 새 키를 누르면 바뀝니다 (ESC 취소)."));
+        p.Children.Add(Note("Ctrl+Alt는 고정입니다. 항목을 누른 뒤 — 바꿀 키 하나만 누르세요 (예: G). ESC로 취소."));
         p.Children.Add(Note(
             "고정 단축키\n" +
             "Ctrl+Alt+.  라디얼 메뉴 (가운데 버튼도 가능)\n" +
@@ -157,13 +158,25 @@ internal sealed class SettingsWindow : Window
     {
         string cur = current;
         bool capturing = false;
-        var txt = new TextBlock { VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, FontSize = 12, FontWeight = FontWeights.SemiBold, Foreground = TextPrimary };
+        var txt = new TextBlock { VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, FontSize = 12 };
         var box = new Border
         {
             Child = txt, Background = SegTrack, CornerRadius = new CornerRadius(7), Padding = new Thickness(12, 5, 12, 5),
-            Cursor = Cursors.Hand, HorizontalAlignment = HorizontalAlignment.Right, MinWidth = 86,
+            Cursor = Cursors.Hand, HorizontalAlignment = HorizontalAlignment.Right, MinWidth = 92,
         };
-        void Render() { txt.Text = capturing ? "키 입력…" : "Ctrl+Alt+" + KeyDisplay(cur); box.Background = capturing ? Accent : SegTrack; txt.Foreground = capturing ? ThumbBg : TextPrimary; }
+        void Render()
+        {
+            box.Background = capturing ? Accent : SegTrack;
+            txt.Inlines.Clear();
+            if (capturing)
+                txt.Inlines.Add(new Run("키 누르기…") { Foreground = ThumbBg, FontWeight = FontWeights.SemiBold });
+            else
+            {
+                // Ctrl+Alt는 고정 → 흐리게, 바꾸는 키만 진하게.
+                txt.Inlines.Add(new Run("Ctrl+Alt+") { Foreground = TextMuted });
+                txt.Inlines.Add(new Run(KeyDisplay(cur)) { Foreground = TextPrimary, FontWeight = FontWeights.Bold });
+            }
+        }
         Render();
 
         Window? win = null;
