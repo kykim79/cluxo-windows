@@ -42,6 +42,9 @@ public readonly record struct RadialVisual(
     IReadOnlyList<bool>? SubActive = null,
     IReadOnlyList<bool>? SubSubActive = null);
 
+/// <summary>스포트라이트 — 커서 주변만 남기고 화면을 어둡게. Radius=맑은 반경(pt), Softness=경계 부드러움(0~1).</summary>
+public readonly record struct SpotlightVisual(double Radius, double Softness);
+
 /// <summary>그리기 툴바 한 항목 — 도구 버튼 / 두께 dot / 색 dot 공용. (맥 DrawingToolbarView 대응)</summary>
 public readonly record struct ToolbarItem(RectD Rect, bool Active, bool Selected, Rgba Color, double Value, DrawingTool Tool);
 
@@ -90,7 +93,8 @@ public readonly record struct OverlayFrame(
     RadialVisual? Radial = null,             // 라디얼 메뉴(중심 있는 모니터만)
     bool Inspector = false,                  // ⌃⌥I 좌표 표시(커서 있는 모니터가 좌표 라벨 렌더)
     ToolbarVisual? Toolbar = null,           // 그리기 모드 플로팅 툴바(툴바 있는 모니터만)
-    RingShape RingShape = RingShape.Circle   // 현재 링 모양 — 효과(클릭/흔들기 등)가 따라가도록 항상 전달
+    RingShape RingShape = RingShape.Circle,  // 현재 링 모양 — 효과(클릭/흔들기 등)가 따라가도록 항상 전달
+    SpotlightVisual? Spotlight = null        // ⌃⌥S 스포트라이트(활성 시 모든 모니터에 전달, 커서 모니터만 구멍)
 );
 
 /// <summary>

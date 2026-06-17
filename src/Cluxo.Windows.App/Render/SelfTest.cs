@@ -153,6 +153,34 @@ internal static class SelfTest
         return 0;
     }
 
+    /// <summary>스포트라이트 렌더 → PNG. 밝은 배경 위에 디밍 + 커서 주변 구멍을 확인.</summary>
+    public static int RunSpotlight()
+    {
+        const int w = 600, h = 360;
+        var monitor = new MonitorInfo("M", new RectD(0, 0, w, h), 1.0, true);
+        var el = new OverlayElement(monitor, () => 0.0) { Width = w, Height = h };
+        el.SetFrame(new OverlayFrame("M", new PointD(w / 2.0, h / 2.0),
+            new RingVisual(new Rgba(0, 230, 255), 27, 1.0, 1.0),
+            Array.Empty<DrawingShape>(), BrandingConfig.Default, OverlayEffects.Empty,
+            Spotlight: new SpotlightVisual(110, 0.5)));
+
+        // 밝은 그라디언트 배경(디밍이 보이도록) + 오버레이.
+        var bgBrush = new LinearGradientBrush(Color.FromRgb(0xFF, 0xE7, 0xB0), Color.FromRgb(0x9B, 0xD8, 0xFF), 30);
+        var stack = new Grid();
+        stack.Children.Add(new System.Windows.Shapes.Rectangle { Fill = bgBrush });
+        for (int gx = 40; gx < w; gx += 80)
+            stack.Children.Add(new System.Windows.Shapes.Rectangle { Width = 40, Height = h, Fill = new SolidColorBrush(Color.FromArgb(40, 0, 0, 0)), HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(gx, 0, 0, 0) });
+        stack.Children.Add(el);
+
+        var border = new Border { Width = w, Height = h, Child = stack };
+        border.Measure(new Size(w, h)); border.Arrange(new Rect(0, 0, w, h)); border.UpdateLayout();
+        var rtb = new RenderTargetBitmap(w, h, 96, 96, PixelFormats.Pbgra32);
+        rtb.Render(border);
+        var enc = new PngBitmapEncoder(); enc.Frames.Add(BitmapFrame.Create(rtb));
+        using (var fs = File.Create(Path.Combine(Path.GetTempPath(), "cluxo-selftest-spotlight.png"))) enc.Save(fs);
+        return 0;
+    }
+
     public static int RunRings()
     {
         const int cell = 130, h = 190;

@@ -85,6 +85,7 @@ internal sealed class OverlayElement : FrameworkElement
 
         PruneFirstSeen(f.Effects);
 
+        DrawSpotlight(dc, f);                                 // 화면 디밍(맨 뒤) — 커서만 강조
         DrawTrail(dc, f.Effects.Trail, accent, 3, 0.5);       // 커서 모션 잔상
         DrawTrail(dc, f.Effects.DragTrail, accent, 5, 0.7);   // 드래그 streak
         DrawScrolls(dc, f.Effects.Scrolls, accent);
@@ -199,6 +200,41 @@ internal sealed class OverlayElement : FrameworkElement
             double radius = 12 + p * 40;
             double alpha = (1 - p) * (c.IsRight ? 0.5 : 0.75);
             dc.DrawGeometry(null, StrokePen(color, c.IsDouble ? 4 : 2, alpha), RingGeometry(ToLocal(c.Position), radius, shape));
+        }
+    }
+
+    // ── 스포트라이트 (커서 주변만 남기고 화면 디밍) ────────────
+    private void DrawSpotlight(DrawingContext dc, OverlayFrame f)
+    {
+        if (f.Spotlight is not { } sp) return;
+        double s = _monitor.DpiScale <= 0 ? 1.0 : _monitor.DpiScale;
+        var rect = new Rect(0, 0, _monitor.Bounds.Width / s, _monitor.Bounds.Height / s);
+        var dark = Color.FromArgb(150, 0, 0, 0); // 디밍 강도(≈0.59)
+
+        if (f.CursorPosition is { } cursor)
+        {
+            var c = ToLocal(cursor);
+            double r = Math.Max(8, sp.Radius);
+            double soft = Math.Clamp(sp.Softness, 0, 1);
+            double outer = r * (1 + soft) + 1;             // 맑은 반경 + 페더
+            double clearStop = Math.Clamp(r / outer, 0, 0.999);
+            var brush = new RadialGradientBrush
+            {
+                MappingMode = BrushMappingMode.Absolute,
+                Center = c, GradientOrigin = c, RadiusX = outer, RadiusY = outer,
+                SpreadMethod = GradientSpreadMethod.Pad,   // 바깥은 마지막(어두움)으로 채움
+            };
+            brush.GradientStops.Add(new GradientStop(Color.FromArgb(0, 0, 0, 0), 0));
+            brush.GradientStops.Add(new GradientStop(Color.FromArgb(0, 0, 0, 0), clearStop));
+            brush.GradientStops.Add(new GradientStop(dark, 1));
+            brush.Freeze();
+            dc.DrawRectangle(brush, null, rect);
+        }
+        else
+        {
+            // 커서 없는 모니터 — 전체 디밍
+            var solid = new SolidColorBrush(dark); solid.Freeze();
+            dc.DrawRectangle(solid, null, rect);
         }
     }
 

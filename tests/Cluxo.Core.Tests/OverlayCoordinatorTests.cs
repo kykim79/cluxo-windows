@@ -891,6 +891,22 @@ public class OverlayCoordinatorTests
     }
 
     [Fact]
+    public void Spotlight_Active_SetsFrameSpotlight()
+    {
+        var h = new Harness();
+        h.Coordinator.Start();
+        h.Cursor.Position = new PointD(100, 100);
+        h.Coordinator.RenderFrame();
+        Assert.Null(h.Factory.Created["A"].Last!.Value.Spotlight); // 기본 OFF
+
+        h.Hotkeys.Press(new HotkeyChord(KeyModifiers.Control | KeyModifiers.Alt, "S")); // ⌃⌥S
+        h.Coordinator.RenderFrame();
+        var spot = h.Factory.Created["A"].Last!.Value.Spotlight;
+        Assert.NotNull(spot);
+        Assert.Equal(130.0, spot!.Value.Radius); // 기본 반경
+    }
+
+    [Fact]
     public void ColorHotkey_NumberSetsColor_AndCycleAdvances()
     {
         var h = new Harness();

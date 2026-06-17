@@ -68,6 +68,8 @@ public sealed class OverlayCoordinator : IDisposable
     private bool _ringDashed;
     private bool _hasInnerRing;          // 이중링 (맥 hasInnerRing)
     private bool _ringFillEnabled = true; // 도넛 채우기 (맥 isRingFillEnabled, 기본 ON)
+    private double _spotlightRadius = 130.0;   // ⌃⌥S 스포트라이트 맑은 반경
+    private double _spotlightSoftness = 0.4;    // 경계 부드러움
     private double _animationSpeed = 1.0;
     private double _keystrokeTimeout = 3.0;
 
@@ -284,6 +286,11 @@ public sealed class OverlayCoordinator : IDisposable
             }
         }
 
+        // 스포트라이트 — 활성 시 모든 모니터에 전달(커서 모니터만 구멍, 나머지는 전체 디밍).
+        SpotlightVisual? spotlight = _runtime.IsSpotlightActive
+            ? new SpotlightVisual(_spotlightRadius, _spotlightSoftness)
+            : null;
+
         // 그리기 툴바 — 활성 시 커서 모니터(없으면 첫 모니터) 하단 중앙에 1회 레이아웃.
         // DrawingState 프레임(히트테스트)과 ToolbarVisual(렌더)을 동시에 채운다.
         ToolbarVisual? toolbar = null;
@@ -338,7 +345,7 @@ public sealed class OverlayCoordinator : IDisposable
                     radialValues, radialSubActive, radialSubSubActive)
                 : null;
             result.Add((renderer, new OverlayFrame(monitor.Id, cursorHere, ring, shapes, branding, effects, keystroke, drag, radial,
-                _runtime.IsInspectorActive, toolbarHere, _ringShape)));
+                _runtime.IsInspectorActive, toolbarHere, _ringShape, spotlight)));
         }
         return result;
     }
@@ -455,6 +462,8 @@ public sealed class OverlayCoordinator : IDisposable
             _ringDashed = _settingsModel.BorderStyle == BorderStyle.Dashed;
             _hasInnerRing = _settingsModel.HasInnerRing;
             _ringFillEnabled = _settingsModel.IsRingFillEnabled;
+            _spotlightRadius = _settingsModel.SpotlightRadius;
+            _spotlightSoftness = _settingsModel.SpotlightEdgeSoftness;
             _animationSpeed = _settingsModel.AnimationSpeed.Multiplier();
             _keystrokeTimeout = _settingsModel.KeystrokeTimeout;
             _shake.RequiredDirChanges = _settingsModel.ShakeSensitivity.RequiredDirChanges();

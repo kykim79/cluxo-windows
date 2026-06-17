@@ -44,6 +44,11 @@ internal static class Program
             Environment.Exit(SelfTest.RunToolbar());
             return;
         }
+        if (args.Length > 0 && args[0] == "--selftest-spotlight")
+        {
+            Environment.Exit(SelfTest.RunSpotlight());
+            return;
+        }
         if (args.Length > 0 && args[0] == "--selftest-rings")
         {
             Environment.Exit(SelfTest.RunRings());
