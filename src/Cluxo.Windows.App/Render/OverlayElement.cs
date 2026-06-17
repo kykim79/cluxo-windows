@@ -95,6 +95,7 @@ internal sealed class OverlayElement : FrameworkElement
         DrawClicks(dc, f.Effects.Clicks, accent, f.RingShape);
 
         DrawRing(dc, f);
+        DrawMagnifier(dc, f);
         DrawDrag(dc, f);
         DrawShapes(dc, f);
         DrawRadial(dc, f, accent);
@@ -236,6 +237,37 @@ internal sealed class OverlayElement : FrameworkElement
             var solid = new SolidColorBrush(dark); solid.Freeze();
             dc.DrawRectangle(solid, null, rect);
         }
+    }
+
+    // ── 돋보기 렌즈 (커서 주변 화면을 확대) ────────────────────
+    private void DrawMagnifier(DrawingContext dc, OverlayFrame f)
+    {
+        if (f.Magnifier is not { } mag || f.CursorPosition is not { } cursor) return;
+        double s = _monitor.DpiScale <= 0 ? 1.0 : _monitor.DpiScale;
+        double zoom = Math.Max(1.1, mag.Zoom);
+        double lensLogical = Math.Max(40, mag.Size);          // 렌즈 지름(논리)
+        double lensPhysical = lensLogical * s;
+        int srcSize = Math.Max(8, (int)Math.Round(lensPhysical / zoom)); // 캡처할 물리 영역(작게)
+
+        // 커서 물리 좌표(가상 데스크톱) 중심으로 캡처. 우리 레이어드 오버레이는 BitBlt에서 제외됨.
+        int srcX = (int)Math.Round(cursor.X - srcSize / 2.0);
+        int srcY = (int)Math.Round(cursor.Y - srcSize / 2.0);
+        var shot = ScreenCapture.CaptureRegion(srcX, srcY, srcSize, srcSize);
+        if (shot is null) return;
+
+        var c = ToLocal(cursor);
+        double r = lensLogical / 2;
+        var lensRect = new Rect(c.X - r, c.Y - r, lensLogical, lensLogical);
+        var clip = new EllipseGeometry(c, r, r);
+        clip.Freeze();
+        dc.PushClip(clip);
+        dc.DrawImage(shot, lensRect);                          // 작은 캡처를 렌즈 크기로 확대 → zoom
+        dc.Pop();
+
+        // 렌즈 테두리 + 옅은 그림자 링
+        var color = f.Ring?.Color ?? new Rgba(0, 230, 255);
+        dc.DrawEllipse(null, new Pen(MakeBrush(Rgba.FromWhite(0.25), 1.0), 6), c, r + 1, r + 1);
+        dc.DrawEllipse(null, new Pen(MakeBrush(color, 0.95), 2.5), c, r, r);
     }
 
     // ── 커서 링 (모양·두께·선 스타일) ──────────────────────────

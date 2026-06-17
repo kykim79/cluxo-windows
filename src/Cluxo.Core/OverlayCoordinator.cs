@@ -70,6 +70,8 @@ public sealed class OverlayCoordinator : IDisposable
     private bool _ringFillEnabled = true; // 도넛 채우기 (맥 isRingFillEnabled, 기본 ON)
     private double _spotlightRadius = 130.0;   // ⌃⌥S 스포트라이트 맑은 반경
     private double _spotlightSoftness = 0.4;    // 경계 부드러움
+    private double _magnifierZoom = 2.0;        // ⌃⌥M 돋보기 배율
+    private double _magnifierSize = 200.0;      // 렌즈 지름
     private double _animationSpeed = 1.0;
     private double _keystrokeTimeout = 3.0;
 
@@ -273,6 +275,10 @@ public sealed class OverlayCoordinator : IDisposable
         SpotlightVisual? spotlight = _runtime.IsSpotlightActive
             ? new SpotlightVisual(_spotlightRadius, _spotlightSoftness)
             : null;
+        // 돋보기 — 활성 시 커서 모니터에만(렌즈가 커서 따라감).
+        MagnifierVisual? magnifier = _runtime.IsMagnifierActive
+            ? new MagnifierVisual(_magnifierZoom, _magnifierSize)
+            : null;
 
         // 그리기 툴바 — 활성 시 커서 모니터(없으면 첫 모니터) 하단 중앙에 1회 레이아웃.
         // DrawingState 프레임(히트테스트)과 ToolbarVisual(렌더)을 동시에 채운다.
@@ -328,7 +334,8 @@ public sealed class OverlayCoordinator : IDisposable
                     radialValues, radialSubActive, radialSubSubActive)
                 : null;
             result.Add((renderer, new OverlayFrame(monitor.Id, cursorHere, ring, shapes, branding, effects, keystroke, drag, radial,
-                _runtime.IsInspectorActive, toolbarHere, _ringShape, spotlight)));
+                _runtime.IsInspectorActive, toolbarHere, _ringShape, spotlight,
+                cursorHere is null ? null : magnifier)));
         }
         return result;
     }
@@ -447,6 +454,8 @@ public sealed class OverlayCoordinator : IDisposable
             _ringFillEnabled = _settingsModel.IsRingFillEnabled;
             _spotlightRadius = _settingsModel.SpotlightRadius;
             _spotlightSoftness = _settingsModel.SpotlightEdgeSoftness;
+            _magnifierZoom = _settingsModel.MagnifierZoom;
+            _magnifierSize = _settingsModel.MagnifierSize;
             _animationSpeed = _settingsModel.AnimationSpeed.Multiplier();
             _keystrokeTimeout = _settingsModel.KeystrokeTimeout;
             _shake.RequiredDirChanges = _settingsModel.ShakeSensitivity.RequiredDirChanges();
