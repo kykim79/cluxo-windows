@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Documents;
 using System.Windows.Input;
+using System.Windows.Markup;
 using System.Windows.Media;
 using System.Windows.Media.Effects;
 using System.Windows.Shapes;
@@ -695,6 +696,41 @@ internal sealed class SettingsWindow : Window
     }
 
     // ── 슬라이더 행 (슬라이더 + 우측 값) ────────────────────────
+    // 예쁜 슬라이더 템플릿 — 둥근 트랙 + accent 채움 + 원형 thumb(그림자). XamlReader로 1회 생성·캐시.
+    private static ControlTemplate? s_sliderTemplate;
+    private static ControlTemplate SliderTemplate() => s_sliderTemplate ??= (ControlTemplate)XamlReader.Parse(@"
+<ControlTemplate TargetType='Slider' xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation'>
+  <Grid VerticalAlignment='Center' Height='20' MinWidth='80'>
+    <Border Height='4' CornerRadius='2' Background='#E5E5EB' VerticalAlignment='Center'/>
+    <Track Name='PART_Track'>
+      <Track.DecreaseRepeatButton>
+        <RepeatButton Command='Slider.DecreaseLarge' Focusable='False'>
+          <RepeatButton.Template><ControlTemplate TargetType='RepeatButton'>
+            <Border Height='4' CornerRadius='2' Background='#0A84FF' VerticalAlignment='Center'/>
+          </ControlTemplate></RepeatButton.Template>
+        </RepeatButton>
+      </Track.DecreaseRepeatButton>
+      <Track.IncreaseRepeatButton>
+        <RepeatButton Command='Slider.IncreaseLarge' Focusable='False'>
+          <RepeatButton.Template><ControlTemplate TargetType='RepeatButton'>
+            <Border Background='Transparent'/>
+          </ControlTemplate></RepeatButton.Template>
+        </RepeatButton>
+      </Track.IncreaseRepeatButton>
+      <Track.Thumb>
+        <Thumb Width='16' Height='16'>
+          <Thumb.Template><ControlTemplate TargetType='Thumb'>
+            <Grid>
+              <Ellipse Fill='White'><Ellipse.Effect><DropShadowEffect BlurRadius='4' ShadowDepth='1' Opacity='0.28' Color='Black'/></Ellipse.Effect></Ellipse>
+              <Ellipse Stroke='#D6D6DC' StrokeThickness='0.7'/>
+            </Grid>
+          </ControlTemplate></Thumb.Template>
+        </Thumb>
+      </Track.Thumb>
+    </Track>
+  </Grid>
+</ControlTemplate>");
+
     private static FrameworkElement SliderRow(double current, double min, double max, double tick, Action<double> onChange, Func<double, string> fmt)
     {
         var valueText = new TextBlock { MinWidth = 42, TextAlignment = TextAlignment.Right, VerticalAlignment = VerticalAlignment.Center, Foreground = TextMuted, FontSize = 12, Text = fmt(current) };
@@ -702,6 +738,7 @@ internal sealed class SettingsWindow : Window
         {
             Minimum = min, Maximum = max, Value = current, TickFrequency = tick, IsSnapToTickEnabled = true,
             VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0),
+            Template = SliderTemplate(),
         };
         slider.ValueChanged += (_, e) => { valueText.Text = fmt(e.NewValue); onChange(e.NewValue); };
         var grid = new Grid();

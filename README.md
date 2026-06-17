@@ -65,4 +65,4 @@ pwsh scripts/publish.ps1                     # 배포용 self-contained 단일 e
 
 ## 라이선스
 
-라이선스 미정. 추가 예정입니다.
+MIT License — 자세한 내용은 [LICENSE](LICENSE) 참조. (macOS Cluxo와 동일)
