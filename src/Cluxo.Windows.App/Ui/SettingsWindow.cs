@@ -123,12 +123,13 @@ internal sealed class SettingsWindow : Window
     private static FrameworkElement ShortcutsTab(CursorSettings s)
     {
         var p = new StackPanel();
+        var cap = new CaptureState();
         p.Children.Add(Card(
-            ("그리기 모드", KeyRecorder(s.HotkeyDrawing, v => s.HotkeyDrawing = v)),
-            ("좌표 표시", KeyRecorder(s.HotkeyInspector, v => s.HotkeyInspector = v)),
-            ("스포트라이트", KeyRecorder(s.HotkeySpotlight, v => s.HotkeySpotlight = v)),
-            ("돋보기", KeyRecorder(s.HotkeyMagnifier, v => s.HotkeyMagnifier = v)),
-            ("키 입력 표시", KeyRecorder(s.HotkeyKeystroke, v => s.HotkeyKeystroke = v))));
+            ("그리기 모드", KeyRecorder(s.HotkeyDrawing, v => s.HotkeyDrawing = v, cap)),
+            ("좌표 표시", KeyRecorder(s.HotkeyInspector, v => s.HotkeyInspector = v, cap)),
+            ("스포트라이트", KeyRecorder(s.HotkeySpotlight, v => s.HotkeySpotlight = v, cap)),
+            ("돋보기", KeyRecorder(s.HotkeyMagnifier, v => s.HotkeyMagnifier = v, cap)),
+            ("키 입력 표시", KeyRecorder(s.HotkeyKeystroke, v => s.HotkeyKeystroke = v, cap))));
         p.Children.Add(Note("모든 단축키는 Ctrl+Alt 조합. 항목을 누르고 새 키를 누르면 바뀝니다 (ESC 취소)."));
         p.Children.Add(Note(
             "고정 단축키\n" +
@@ -147,8 +148,12 @@ internal sealed class SettingsWindow : Window
         return p;
     }
 
+    /// <summary>한 번에 한 레코더만 캡처하도록 공유하는 상태(직전 캡처 중지).</summary>
+    private sealed class CaptureState { public Action? StopActive; }
+
     // ── 키 레코더 — 클릭 후 키를 누르면 그 키로 재지정(모디파이어 Ctrl+Alt 고정) ──
-    private static FrameworkElement KeyRecorder(string current, Action<string> onChange)
+    // Border는 키보드 포커스를 잘 못 받으므로, 캡처 중엔 부모 Window의 PreviewKeyDown을 직접 구독한다.
+    private static FrameworkElement KeyRecorder(string current, Action<string> onChange, CaptureState cap)
     {
         string cur = current;
         bool capturing = false;
@@ -156,20 +161,39 @@ internal sealed class SettingsWindow : Window
         var box = new Border
         {
             Child = txt, Background = SegTrack, CornerRadius = new CornerRadius(7), Padding = new Thickness(12, 5, 12, 5),
-            Cursor = Cursors.Hand, Focusable = true, HorizontalAlignment = HorizontalAlignment.Right, MinWidth = 78,
+            Cursor = Cursors.Hand, HorizontalAlignment = HorizontalAlignment.Right, MinWidth = 86,
         };
         void Render() { txt.Text = capturing ? "키 입력…" : "Ctrl+Alt+" + KeyDisplay(cur); box.Background = capturing ? Accent : SegTrack; txt.Foreground = capturing ? ThumbBg : TextPrimary; }
         Render();
-        box.MouseLeftButtonUp += (_, _) => { capturing = true; Render(); Keyboard.Focus(box); };
-        box.LostKeyboardFocus += (_, _) => { if (capturing) { capturing = false; Render(); } };
-        box.PreviewKeyDown += (_, e) =>
+
+        Window? win = null;
+        KeyEventHandler? handler = null;
+        void Stop()
         {
-            if (!capturing) return;
-            e.Handled = true;
-            var key = e.Key == Key.System ? e.SystemKey : e.Key;
-            if (IsModifier(key)) return;
-            if (key == Key.Escape) { capturing = false; Render(); return; }
-            if (KeyToName(key) is { } name) { cur = name; onChange(name); capturing = false; Render(); }
+            capturing = false; Render();
+            if (win is not null && handler is not null) win.PreviewKeyDown -= handler;
+            win = null; handler = null;
+            if (cap.StopActive == Stop) cap.StopActive = null;
+        }
+
+        box.MouseLeftButtonUp += (_, _) =>
+        {
+            if (capturing) { Stop(); return; }       // 다시 누르면 취소
+            cap.StopActive?.Invoke();                 // 다른 레코더가 캡처 중이면 중지
+            win = Window.GetWindow(box);
+            if (win is null) return;                  // 셀프테스트 등 부모 창 없음
+            capturing = true; Render();
+            handler = (_, e) =>
+            {
+                var key = e.Key == Key.System ? e.SystemKey : e.Key;
+                if (IsModifier(key)) return;          // 모디파이어 단독은 무시(계속 대기)
+                e.Handled = true;
+                if (key == Key.Escape) { Stop(); return; }
+                if (KeyToName(key) is { } name) { cur = name; onChange(name); }
+                Stop();                               // 지원 키면 적용, 아니면 취소 — 어느 쪽이든 종료
+            };
+            win.PreviewKeyDown += handler;
+            cap.StopActive = Stop;
         };
         return box;
     }
