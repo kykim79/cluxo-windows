@@ -45,7 +45,9 @@ Name: "{group}\{cm:UninstallProgram,Cluxo}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\Cluxo"; Filename: "{app}\Cluxo.Windows.App.exe"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\Cluxo.Windows.App.exe"; Description: "{cm:LaunchProgram,Cluxo}"; Flags: nowait postinstall skipifsilent
+; shellexec — 앱이 requireAdministrator라 CreateProcess로는 코드 740(권한 상승 필요)이 난다.
+; ShellExecute로 실행해 권한 상승을 처리(설치 프로그램이 이미 관리자면 추가 UAC 없이 실행).
+Filename: "{app}\Cluxo.Windows.App.exe"; Description: "{cm:LaunchProgram,Cluxo}"; Flags: nowait postinstall skipifsilent shellexec
 
 [UninstallRun]
 ; 제거 시 실행 중인 Cluxo 종료

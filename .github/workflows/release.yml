@@ -69,6 +69,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $appver = $env:RELEASE_TAG -replace '^v',''
+          # 같은 태그 재배포 시 기존 릴리스를 지우고(태그는 유지) 새로 만든다 — create 충돌 방지.
+          gh release delete $env:RELEASE_TAG --yes 2>$null
           gh release create $env:RELEASE_TAG `
             "publish/win-x64/Cluxo-$env:RELEASE_TAG-win-x64.exe" `
             "installer-out/Cluxo-Setup-$appver.exe" `
