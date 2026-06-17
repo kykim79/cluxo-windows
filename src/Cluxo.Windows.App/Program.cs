@@ -128,26 +128,40 @@ internal static class Program
         // T2: 마우스 후킹 분실 → 재설치됨을 트레이 풍선으로 알림.
         coordinator.MouseHookLost += () => shell.ShowTrayBalloon("Cluxo", "마우스 후킹이 재설치되었습니다.");
 
-        // 트레이 메뉴 — 열 때마다 현재 상태로 체크 표시 갱신.
-        IReadOnlyList<TrayMenuItem> BuildMenu() => new[]
+        // 트레이 메뉴 (맥 구조) — 환경설정 / 언어 ▶ / 활성·비활성 / 종료. 열 때마다 현재 상태로 갱신.
+        IReadOnlyList<TrayMenuItem> BuildMenu()
         {
-            new TrayMenuItem("drawing", "그리기 모드", IsChecked: coordinator.IsDrawingModeActive),
-            new TrayMenuItem("inspector", "좌표 표시", IsChecked: coordinator.IsInspectorActive),
-            new TrayMenuItem("settings", "설정...", IsSeparatorBefore: true),
-            new TrayMenuItem("quit", "종료", IsSeparatorBefore: true),
-        };
+            var lang = coordinator.Settings.PreferredLanguage;
+            var langSub = new[]
+            {
+                new TrayMenuItem("lang.system", "시스템 기본", IsChecked: lang == PreferredLanguage.System),
+                new TrayMenuItem("lang.ko", "한국어", IsChecked: lang == PreferredLanguage.Ko),
+                new TrayMenuItem("lang.en", "English", IsChecked: lang == PreferredLanguage.En),
+            };
+            return new[]
+            {
+                new TrayMenuItem("settings", "환경설정..."),
+                new TrayMenuItem("lang", "언어", Submenu: langSub),
+                new TrayMenuItem("active", coordinator.IsActive ? "비활성화" : "활성화", IsSeparatorBefore: true),
+                new TrayMenuItem("quit", "종료", IsSeparatorBefore: true),
+            };
+        }
         shell.SetTrayMenuProvider(BuildMenu);
         shell.Tray.SetMenu(BuildMenu()); // 초기 항목(폴백)
         shell.Tray.ItemClicked += id =>
         {
             switch (id)
             {
-                case "drawing": coordinator.ToggleDrawingMode(); break;
-                case "inspector": coordinator.ToggleInspector(); break;
                 case "settings": overlay.ShowSettings(coordinator.Settings, shell.LaunchAtLogin); break;
+                case "lang.system": coordinator.Settings.PreferredLanguage = PreferredLanguage.System; break;
+                case "lang.ko": coordinator.Settings.PreferredLanguage = PreferredLanguage.Ko; break;
+                case "lang.en": coordinator.Settings.PreferredLanguage = PreferredLanguage.En; break;
+                case "active": coordinator.ToggleActive(); break;
                 case "quit": exit.Set(); break;
             }
         };
+        // 트레이 아이콘 좌클릭 — 맥처럼 활성/비활성 토글.
+        shell.Tray.IconClicked += coordinator.ToggleActive;
 
         coordinator.Start();
         overlay.StartRenderLoop(

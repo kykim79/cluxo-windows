@@ -47,9 +47,10 @@ public readonly record struct SpotlightVisual(double Radius, double Softness);
 
 /// <summary>
 /// 돋보기 상태 — Windows Magnification API 호스트 구동용. 좌표·크기는 물리 픽셀(가상 데스크톱).
-/// CursorPhysical=렌즈 중심, Zoom=배율, LensPhysical=렌즈 지름(물리). 활성 아닐 땐 null.
+/// CursorPhysical=렌즈 중심, Zoom=배율, LensPhysical=렌즈 지름(물리), Border=테두리 색(렌즈 창에 직접
+/// 그려 콘텐츠와 함께 움직이게 — WPF 별도 렌더 시 생기는 지연 제거). 활성 아닐 땐 null.
 /// </summary>
-public readonly record struct MagnifierState(PointD CursorPhysical, double Zoom, double LensPhysical);
+public readonly record struct MagnifierState(PointD CursorPhysical, double Zoom, double LensPhysical, Rgba Border);
 
 /// <summary>그리기 툴바 한 항목 — 도구 버튼 / 두께 dot / 색 dot 공용. (맥 DrawingToolbarView 대응)</summary>
 public readonly record struct ToolbarItem(RectD Rect, bool Active, bool Selected, Rgba Color, double Value, DrawingTool Tool);
@@ -100,9 +101,8 @@ public readonly record struct OverlayFrame(
     bool Inspector = false,                  // ⌃⌥I 좌표 표시(커서 있는 모니터가 좌표 라벨 렌더)
     ToolbarVisual? Toolbar = null,           // 그리기 모드 플로팅 툴바(툴바 있는 모니터만)
     RingShape RingShape = RingShape.Circle,  // 현재 링 모양 — 효과(클릭/흔들기 등)가 따라가도록 항상 전달
-    SpotlightVisual? Spotlight = null,       // ⌃⌥S 스포트라이트(활성 시 모든 모니터에 전달, 커서 모니터만 구멍)
-    double? MagnifierLens = null             // ⌃⌥M 돋보기 렌즈 지름(논리, 커서 모니터만) — 렌즈 가장자리 테두리 링용.
-);                                            // 확대 자체는 Magnification API 별도 창(coordinator.CurrentMagnifier)이 그린다.
+    SpotlightVisual? Spotlight = null        // ⌃⌥S 스포트라이트(활성 시 모든 모니터에 전달, 커서 모니터만 구멍)
+);                                            // ⌃⌥M 돋보기(확대+테두리)는 Magnification API 별도 창(coordinator.CurrentMagnifier)이 그린다.
 
 /// <summary>
 /// 한 모니터의 투명·클릭통과·항상위 오버레이 렌더러. (Vortice Direct2D + DirectComposition 레이어드 윈도우)

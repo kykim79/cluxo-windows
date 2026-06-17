@@ -21,6 +21,7 @@ internal sealed class Win32TrayIcon : ITrayIcon
     private IntPtr _icon; // 파일에서 로드한 아이콘(소유 → DestroyIcon)
 
     public event Action<string>? ItemClicked;
+    public event Action? IconClicked;
 
     /// <summary>설정 시 메뉴를 열 때마다 현재 상태로 항목을 새로 빌드(체크 표시 갱신용). 없으면 <see cref="SetMenu"/> 정적 항목.</summary>
     public Func<IReadOnlyList<TrayMenuItem>>? MenuProvider { get; set; }
@@ -85,6 +86,8 @@ internal sealed class Win32TrayIcon : ITrayIcon
         uint mouseMsg = (uint)(lParam.ToInt64() & 0xFFFF);
         if (mouseMsg is SN.WM_RBUTTONUP or SN.WM_CONTEXTMENU)
             ShowMenu(); // 호스트 스레드에서 실행 중
+        else if (mouseMsg == SN.WM_LBUTTONUP)
+            IconClicked?.Invoke(); // 좌클릭 — 활성/비활성 토글(맥 대응)
     }
 
     /// <summary>풍선 알림(예: 마우스 후킹 재설치 T2). 호스트 스레드로 마샬링.</summary>
@@ -113,29 +116,45 @@ internal sealed class Win32TrayIcon : ITrayIcon
         var items = MenuProvider?.Invoke() ?? _items;
         if (items.Count == 0) return;
 
-        IntPtr menu = SN.CreatePopupMenu();
+        var flat = new List<TrayMenuItem>();   // cmd id(1-based) → 클릭 가능한 항목(서브메뉴 부모 제외)
+        IntPtr root = BuildMenu(items, flat);
         try
         {
-            for (int i = 0; i < items.Count; i++)
-            {
-                var it = items[i];
-                if (it.IsSeparatorBefore) SN.AppendMenu(menu, SN.MF_SEPARATOR, UIntPtr.Zero, null);
-                uint flags = SN.MF_STRING
-                    | (it.IsChecked ? SN.MF_CHECKED : 0u)
-                    | (it.IsEnabled ? 0u : SN.MF_GRAYED);
-                SN.AppendMenu(menu, flags, (UIntPtr)(i + 1), it.Label); // cmd id = index+1 (0=선택없음)
-            }
-
             IN.GetCursorPos(out var pt);
             SN.SetForegroundWindow(_host.Hwnd); // 메뉴가 바깥 클릭에 안 닫히는 버그 회피
-            int cmd = SN.TrackPopupMenu(menu, SN.TPM_RETURNCMD | SN.TPM_RIGHTBUTTON,
+            int cmd = SN.TrackPopupMenu(root, SN.TPM_RETURNCMD | SN.TPM_RIGHTBUTTON,
                 pt.X, pt.Y, 0, _host.Hwnd, IntPtr.Zero);
-            if (cmd > 0 && cmd <= items.Count) ItemClicked?.Invoke(items[cmd - 1].Id);
+            if (cmd > 0 && cmd <= flat.Count) ItemClicked?.Invoke(flat[cmd - 1].Id);
         }
         finally
         {
-            SN.DestroyMenu(menu);
+            SN.DestroyMenu(root); // 서브메뉴 HMENU도 함께 파기됨
         }
+    }
+
+    // 메뉴/서브메뉴를 재귀로 만든다. 클릭 가능한 항목은 flat에 1-based cmd id로 누적.
+    private static IntPtr BuildMenu(IReadOnlyList<TrayMenuItem> items, List<TrayMenuItem> flat)
+    {
+        IntPtr menu = SN.CreatePopupMenu();
+        foreach (var it in items)
+        {
+            if (it.IsSeparatorBefore) SN.AppendMenu(menu, SN.MF_SEPARATOR, UIntPtr.Zero, null);
+            if (it.Submenu is { Count: > 0 } sub)
+            {
+                IntPtr child = BuildMenu(sub, flat);
+                uint pflags = SN.MF_STRING | SN.MF_POPUP | (it.IsEnabled ? 0u : SN.MF_GRAYED);
+                SN.AppendMenu(menu, pflags, (UIntPtr)(long)child, it.Label);
+            }
+            else
+            {
+                flat.Add(it);
+                uint flags = SN.MF_STRING
+                    | (it.IsChecked ? SN.MF_CHECKED : 0u)
+                    | (it.IsEnabled ? 0u : SN.MF_GRAYED);
+                SN.AppendMenu(menu, flags, (UIntPtr)flat.Count, it.Label); // cmd id = 누적 순서(0=선택없음)
+            }
+        }
+        return menu;
     }
 
     public void Dispose()

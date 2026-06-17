@@ -111,6 +111,26 @@ public sealed class OverlayCoordinator : IDisposable
     public bool IsRadialMenuActive { get { lock (_gate) return _runtime.IsRadialMenuActive; } }
     public bool IsSpotlightActive { get { lock (_gate) return _runtime.IsSpotlightActive; } }
 
+    /// <summary>전체 활성 여부(트레이 토글). false면 아무 오버레이도 안 그린다(맥 비활성화 대응).</summary>
+    public bool IsActive { get { lock (_gate) return _active; } }
+    private bool _active = true;
+
+    /// <summary>활성/비활성 전환 시 발생(트레이 메뉴·아이콘 체크 갱신용). 인자는 활성 여부.</summary>
+    public event Action<bool>? ActiveChanged;
+
+    /// <summary>전체 활성/비활성 토글 — 트레이 아이콘 클릭·메뉴. 비활성 시 트레일/효과를 비운다.</summary>
+    public void ToggleActive()
+    {
+        bool active;
+        lock (_gate)
+        {
+            _active = !_active;
+            active = _active;
+            if (!active) { _effects.ClearTrail(); _effects.ClearDragTrail(); }
+        }
+        ActiveChanged?.Invoke(active);
+    }
+
     /// <summary>
     /// ⌃⌥M 돋보기 상태 — 활성이면 커서 물리 좌표·배율·렌즈 물리 지름, 아니면 null.
     /// 렌더 호스트가 매 프레임 폴링해 Magnification API 창을 구동한다(WPF 렌더와 별도).
@@ -122,10 +142,10 @@ public sealed class OverlayCoordinator : IDisposable
             lock (_gate)
             {
                 // 라디얼/그리기 중엔 렌즈를 숨겨(topmost 창이 메뉴를 덮지 않게).
-                if (!_runtime.IsMagnifierActive || _runtime.IsRadialMenuActive || _drawing.IsDrawingModeActive) return null;
+                if (!_active || !_runtime.IsMagnifierActive || _runtime.IsRadialMenuActive || _drawing.IsDrawingModeActive) return null;
                 var pos = _runtime.CursorPosition;
                 double dpi = MonitorContaining(pos)?.DpiScale ?? 1.0;
-                return new MagnifierState(pos, _magnifierZoom, _magnifierSize * dpi);
+                return new MagnifierState(pos, _magnifierZoom, _magnifierSize * dpi, _activeColor);
             }
         }
     }
@@ -188,13 +208,20 @@ public sealed class OverlayCoordinator : IDisposable
         {
             _runtime.CursorPosition = pos;
 
-            if (_runtime.IsRadialMenuActive)
+            // 비활성화(트레이 토글) — 아무것도 그리지 않는다(맥 비활성화 대응). 효과 처리도 건너뜀.
+            if (!_active)
             {
-                // 라디얼 메뉴 모드 — 일반 인터랙션 억제, 커서로 선택만 추적
-                _radial.Update(pos, now);
+                batch = BuildEmptyFrames();
             }
             else
             {
+              if (_runtime.IsRadialMenuActive)
+              {
+                // 라디얼 메뉴 모드 — 일반 인터랙션 억제, 커서로 선택만 추적
+                _radial.Update(pos, now);
+              }
+              else
+              {
                 bool drawing = _drawing.IsDrawingModeActive;
                 // 흔들기 감지 — 시간은 IClock에서만(wall clock 없음)
                 bool shook = _shake.Record(pos.X, pos.Y, now);
@@ -248,9 +275,10 @@ public sealed class OverlayCoordinator : IDisposable
             else if (_effects.Trail.Count > 0)
                 _effects.ClearTrail();
 
-            _effects.Prune(now);   // 만료 효과 + 드래그 trail fade 진행
-            _keystrokes.Tick(now); // 키스트로크 오버레이 자동 숨김
-            batch = BuildFrames(pos);
+              _effects.Prune(now);   // 만료 효과 + 드래그 trail fade 진행
+              _keystrokes.Tick(now); // 키스트로크 오버레이 자동 숨김
+              batch = BuildFrames(pos);
+            }
         }
 
         foreach (var (renderer, frame) in batch)
@@ -294,8 +322,6 @@ public sealed class OverlayCoordinator : IDisposable
         SpotlightVisual? spotlight = _runtime.IsSpotlightActive
             ? new SpotlightVisual(_spotlightRadius, _spotlightSoftness)
             : null;
-        // 돋보기 — 라디얼/그리기 중엔 메뉴를 가리지 않게 숨긴다(렌즈 창이 topmost라 메뉴를 덮음).
-        bool magnifierOn = _runtime.IsMagnifierActive && !_runtime.IsRadialMenuActive && !_drawing.IsDrawingModeActive;
 
         // 그리기 툴바 — 활성 시 커서 모니터(없으면 첫 모니터) 하단 중앙에 1회 레이아웃.
         // DrawingState 프레임(히트테스트)과 ToolbarVisual(렌더)을 동시에 채운다.
@@ -351,9 +377,20 @@ public sealed class OverlayCoordinator : IDisposable
                     radialValues, radialSubActive, radialSubSubActive)
                 : null;
             result.Add((renderer, new OverlayFrame(monitor.Id, cursorHere, ring, shapes, branding, effects, keystroke, drag, radial,
-                _runtime.IsInspectorActive, toolbarHere, _ringShape, spotlight,
-                magnifierOn && cursorHere is not null ? _magnifierSize : (double?)null)));
+                _runtime.IsInspectorActive, toolbarHere, _ringShape, spotlight)));
         }
+        return result;
+    }
+
+    // 비활성 — 모든 모니터에 빈 프레임(링·효과·모든 오버레이 없음)을 보내 화면을 비운다.
+    private List<(IOverlayRenderer, OverlayFrame)> BuildEmptyFrames()
+    {
+        var branding = _branding.Current;
+        var result = new List<(IOverlayRenderer, OverlayFrame)>(_renderers.Count);
+        foreach (var monitor in _monitors.Monitors)
+            if (_renderers.TryGetValue(monitor.Id, out var renderer))
+                result.Add((renderer, new OverlayFrame(monitor.Id, null, null,
+                    Array.Empty<DrawingShape>(), branding, OverlayEffects.Empty)));
         return result;
     }
 
@@ -524,6 +561,7 @@ public sealed class OverlayCoordinator : IDisposable
         bool active;
         lock (_gate)
         {
+            if (!_active) return; // 비활성 — 그리기 모드 진입 무시
             _drawing.ToggleMode();
             active = _drawing.IsDrawingModeActive;
             _keystrokes.ShowStatusNotification(active ? "그리기 모드 ON" : "그리기 모드 OFF", now);
@@ -536,6 +574,7 @@ public sealed class OverlayCoordinator : IDisposable
         double now = _clock.NowSeconds;
         lock (_gate)
         {
+            if (!_active) return; // 비활성 — 입력 무시
             // 가운데 버튼 — 라디얼 토글(맥 클릭 모델). 닫혀 있으면 열고 유지, 열려 있으면 클릭 지점을
             // 커밋: leaf는 실행 후 메뉴 유지(연속 토글), 중앙 dead zone(✕)/바깥 클릭만 닫는다. 앱으론 후킹이 흡수.
             if (button == MouseButton.Middle)
@@ -721,7 +760,7 @@ public sealed class OverlayCoordinator : IDisposable
     {
         lock (_gate)
         {
-            if (_drawing.IsDrawingModeActive) return; // 그리기 중엔 무시
+            if (!_active || _drawing.IsDrawingModeActive) return; // 비활성·그리기 중엔 무시
             if (_runtime.IsRadialMenuActive)
             {
                 _radial.Cancel(); // 키 토글 닫기 = 실행 없이 취소
@@ -811,6 +850,7 @@ public sealed class OverlayCoordinator : IDisposable
         double now = _clock.NowSeconds;
         lock (_gate)
         {
+            if (!_active) return; // 비활성 — 입력 무시
             if (_runtime.IsRadialMenuActive || _drawing.IsDrawingModeActive) return; // 효과 억제
             if (!_scrollEnabled) return; // 스크롤 표시 설정 OFF
             bool isVertical = Math.Abs(delta.Y) >= Math.Abs(delta.X);
@@ -828,6 +868,7 @@ public sealed class OverlayCoordinator : IDisposable
         double now = _clock.NowSeconds;
         lock (_gate)
         {
+            if (!_active) { _modifiers = e.Modifiers; return; } // 비활성 — 효과/그리기 키 무시(모디파이어만 추적)
             _modifiers = e.Modifiers;
             _drawing.CurrentModifiers = e.Modifiers;
 

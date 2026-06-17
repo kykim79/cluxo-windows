@@ -85,8 +85,9 @@ public sealed class WpfOverlayHost : IDisposable
         {
             IntPtr[] exclude;
             lock (_renderers) exclude = _renderers.Select(r => r.Hwnd).Where(h => h != IntPtr.Zero).ToArray();
+            int colorRef = m.Border.R | (m.Border.G << 8) | (m.Border.B << 16); // Rgba → COLORREF(0x00BBGGRR)
             _magnifier.Update((int)Math.Round(m.CursorPhysical.X), (int)Math.Round(m.CursorPhysical.Y),
-                m.Zoom, (int)Math.Round(m.LensPhysical), exclude);
+                m.Zoom, (int)Math.Round(m.LensPhysical), colorRef, exclude);
         }
         else
         {

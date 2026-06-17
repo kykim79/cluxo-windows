@@ -28,9 +28,11 @@ public interface ILaunchAtLogin
     bool IsEnabled { get; set; }
 }
 
-/// <summary>트레이 메뉴 항목 한 줄. IsSeparatorBefore=true면 이 항목 위에 구분선.</summary>
+/// <summary>트레이 메뉴 항목 한 줄. IsSeparatorBefore=true면 이 항목 위에 구분선.
+/// Submenu가 있으면 하위 메뉴(▶)로 펼쳐진다(이 항목 자체는 클릭 동작 없음).</summary>
 public readonly record struct TrayMenuItem(
-    string Id, string Label, bool IsChecked = false, bool IsEnabled = true, bool IsSeparatorBefore = false);
+    string Id, string Label, bool IsChecked = false, bool IsEnabled = true, bool IsSeparatorBefore = false,
+    IReadOnlyList<TrayMenuItem>? Submenu = null);
 
 /// <summary>시스템 트레이 아이콘 + 메뉴. (Shell_NotifyIcon, 작업표시줄 미노출)</summary>
 public interface ITrayIcon : IDisposable
@@ -40,6 +42,9 @@ public interface ITrayIcon : IDisposable
 
     /// <summary>항목 클릭 — 인자는 항목 Id.</summary>
     event Action<string>? ItemClicked;
+
+    /// <summary>트레이 아이콘 좌클릭 — 맥처럼 활성/비활성 토글에 쓴다.</summary>
+    event Action? IconClicked;
 }
 
 /// <summary>포그라운드 앱 식별 — 발표/녹화 앱 감지에 사용.</summary>

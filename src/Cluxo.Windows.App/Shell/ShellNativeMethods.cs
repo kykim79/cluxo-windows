@@ -110,7 +110,7 @@ internal static class ShellNativeMethods
 
     // ── 팝업 메뉴 ───────────────────────────────────────────────
     public const uint MF_STRING = 0x0000, MF_GRAYED = 0x0001, MF_DISABLED = 0x0002,
-                      MF_CHECKED = 0x0008, MF_SEPARATOR = 0x0800;
+                      MF_CHECKED = 0x0008, MF_POPUP = 0x0010, MF_SEPARATOR = 0x0800;
     public const uint TPM_RETURNCMD = 0x0100, TPM_RIGHTBUTTON = 0x0002, TPM_NONOTIFY = 0x0080;
 
     [DllImport("user32.dll")]

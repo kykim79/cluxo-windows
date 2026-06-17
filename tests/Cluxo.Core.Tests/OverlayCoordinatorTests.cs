@@ -899,6 +899,31 @@ public class OverlayCoordinatorTests
     }
 
     [Fact]
+    public void Inactive_RendersEmptyFrames_AndReactivates()
+    {
+        var h = new Harness();
+        h.Settings.Store.Set("isTrailEnabled", true);
+        h.Coordinator.Start();
+        h.Cursor.Position = new PointD(100, 100);
+        h.Coordinator.RenderFrame();
+        Assert.NotNull(h.Factory.Created["A"].Last!.Value.Ring); // 활성 — 링 있음
+
+        h.Coordinator.ToggleActive(); // 비활성(트레이 토글)
+        Assert.False(h.Coordinator.IsActive);
+        h.Hotkeys.Press(new HotkeyChord(KeyModifiers.Control | KeyModifiers.Alt, "M")); // 비활성 중 돋보기 시도
+        h.Coordinator.RenderFrame();
+        var f = h.Factory.Created["A"].Last!.Value;
+        Assert.Null(f.Ring);                          // 링 없음
+        Assert.Empty(f.Effects.Clicks);
+        Assert.Null(h.Coordinator.CurrentMagnifier);  // 비활성 중엔 돋보기도 null
+
+        h.Coordinator.ToggleActive(); // 다시 활성
+        Assert.True(h.Coordinator.IsActive);
+        h.Coordinator.RenderFrame();
+        Assert.NotNull(h.Factory.Created["A"].Last!.Value.Ring); // 링 복귀
+    }
+
+    [Fact]
     public void SpotlightHotkey_Toggles()
     {
         var h = new Harness();
