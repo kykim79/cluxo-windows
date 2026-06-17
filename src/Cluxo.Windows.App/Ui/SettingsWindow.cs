@@ -145,11 +145,19 @@ internal sealed class SettingsWindow : Window
     {
         var p = new StackPanel();
         p.Children.Add(Card(
-            ("언어", SegEnum(s.PreferredLanguage, v => s.PreferredLanguage = v, v => v.Label())),
+            ("표시 언어", SegEnum(s.PreferredLanguage, v => s.PreferredLanguage = v, v => v.Label())),
             ("로그인 시 실행", Switch(launch.IsEnabled, v => launch.IsEnabled = v))));
+        p.Children.Add(Note("표시 언어는 변경 후 Cluxo를 재시작해야 적용됩니다. '시스템 기본'은 Windows 시스템 언어를 따릅니다."));
+        p.Children.Add(AppInfoSection());
         p.Children.Add(UpdateSection(s));
         return p;
     }
+
+    // ── 앱 정보 (버전 / 개발자 / 최소 요구 사항) — 맥 일반 탭 대응 ──
+    private static FrameworkElement AppInfoSection() => Card(
+        ("버전", new TextBlock { Text = "v" + UpdateService.CurrentVersion, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Right, Foreground = TextPrimary, FontSize = 13 }),
+        ("개발자", new TextBlock { Text = "kykim79", VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Right, Foreground = TextPrimary, FontSize = 13 }),
+        ("최소 요구 사항", new TextBlock { Text = "Windows 10 / 11", VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Right, Foreground = TextPrimary, FontSize = 13 }));
 
     // ── 업데이트 (직접 배포 — 매니페스트 확인 + 설치본 다운로드·실행) ──
     private static FrameworkElement UpdateSection(CursorSettings s)
@@ -210,31 +218,13 @@ internal sealed class SettingsWindow : Window
         btnRow.Children.Add(updateBtn);
 
         var content = new StackPanel();
-        content.Children.Add(Row("현재 버전", new TextBlock
-        {
-            Text = "v" + UpdateService.CurrentVersion, VerticalAlignment = VerticalAlignment.Center,
-            HorizontalAlignment = HorizontalAlignment.Right, Foreground = TextPrimary, FontSize = 13,
-        }));
-        content.Children.Add(new Border { Height = 1, Background = DividerBrush, Margin = new Thickness(-14, 0, -14, 8) });
-
-        // 업데이트 매니페스트 URL — 배포/코브랜딩 시 미리 채우거나, 여기서 직접 입력.
-        content.Children.Add(new TextBlock { Text = "업데이트 소스 (GitHub owner/repo 또는 매니페스트 URL)", Foreground = TextMuted, FontSize = 11, Margin = new Thickness(0, 0, 0, 4) });
-        var urlBox = new TextBox
-        {
-            Text = s.UpdateManifestUrl, FontSize = 12, Foreground = TextPrimary,
-            Background = System.Windows.Media.Brushes.Transparent, BorderThickness = new Thickness(0),
-            Padding = new Thickness(9, 6, 9, 6), VerticalContentAlignment = VerticalAlignment.Center,
-        };
-        urlBox.TextChanged += (_, _) => s.UpdateManifestUrl = urlBox.Text.Trim();
-        content.Children.Add(new Border { Background = SegTrack, CornerRadius = new CornerRadius(6), Child = urlBox, Margin = new Thickness(0, 0, 0, 10) });
-
-        content.Children.Add(btnRow);
+        content.Children.Add(Row("업데이트", btnRow));
         content.Children.Add(status);
 
         return new Border
         {
             Background = CardBg, BorderBrush = CardBorder, BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(10), Padding = new Thickness(14, 10, 14, 12),
+            CornerRadius = new CornerRadius(10), Padding = new Thickness(14, 6, 14, 12),
             Child = content, Margin = new Thickness(0, 0, 0, 12),
         };
     }
