@@ -56,6 +56,13 @@ public sealed class CursorSettings
     public double MagnifierZoom { get => Get("magnifierZoom", 2.0); set => Set("magnifierZoom", value); }
     public double MagnifierSize { get => Get("magnifierSize", 200.0); set => Set("magnifierSize", value); }
 
+    // ── 단축키 (키 부분만 — 모디파이어는 Ctrl+Alt 고정). HotkeyChord 키 문자열, 기본은 맥과 동일. ──
+    public string HotkeyDrawing { get => Get("hotkey.drawing", "D"); set => Set("hotkey.drawing", value); }
+    public string HotkeyInspector { get => Get("hotkey.inspector", "I"); set => Set("hotkey.inspector", value); }
+    public string HotkeySpotlight { get => Get("hotkey.spotlight", "S"); set => Set("hotkey.spotlight", value); }
+    public string HotkeyMagnifier { get => Get("hotkey.magnifier", "M"); set => Set("hotkey.magnifier", value); }
+    public string HotkeyKeystroke { get => Get("hotkey.keystroke", "K"); set => Set("hotkey.keystroke", value); }
+
     // ── 그리기 toolbar 위치 ──────────────────────────────────────
     public double DrawingToolbarLeading { get => Get("drawingToolbarLeading", 28.0); set => Set("drawingToolbarLeading", value); }
     public double DrawingToolbarBottom { get => Get("drawingToolbarBottom", 110.0); set => Set("drawingToolbarBottom", value); }

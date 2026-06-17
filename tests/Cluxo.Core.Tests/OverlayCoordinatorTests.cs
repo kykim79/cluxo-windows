@@ -879,6 +879,26 @@ public class OverlayCoordinatorTests
     }
 
     [Fact]
+    public void Hotkey_Rebind_ReregistersToNewKey()
+    {
+        var h = new Harness();
+        h.Coordinator.Start();
+        // 기본 ⌃⌥D → 그리기 토글
+        h.Hotkeys.Press(new HotkeyChord(KeyModifiers.Control | KeyModifiers.Alt, "D"));
+        Assert.True(h.Coordinator.IsDrawingModeActive);
+        h.Hotkeys.Press(new HotkeyChord(KeyModifiers.Control | KeyModifiers.Alt, "D")); // 끄기
+        Assert.False(h.Coordinator.IsDrawingModeActive);
+
+        // 그리기 단축키를 G로 재지정 → 재등록
+        h.Coordinator.Settings.HotkeyDrawing = "G";
+        Assert.False(h.Coordinator.IsDrawingModeActive);
+        h.Hotkeys.Press(new HotkeyChord(KeyModifiers.Control | KeyModifiers.Alt, "D")); // 옛 키 — 더는 동작 안 함
+        Assert.False(h.Coordinator.IsDrawingModeActive);
+        h.Hotkeys.Press(new HotkeyChord(KeyModifiers.Control | KeyModifiers.Alt, "G")); // 새 키
+        Assert.True(h.Coordinator.IsDrawingModeActive);
+    }
+
+    [Fact]
     public void SpotlightHotkey_Toggles()
     {
         var h = new Harness();

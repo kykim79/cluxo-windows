@@ -136,24 +136,7 @@ public sealed class OverlayCoordinator : IDisposable
         _radial = new RadialMenuController(_settingsModel, _runtime); // 로드된 설정으로 재생성
         lock (_gate) _drawing.LineWidth = _store.Get(LineWidthKey, Tokens.Drawing.LineWidth);
         ApplyRuntimeSettings(); // 캐시 채우기 + shake 민감도 적용
-
-        // 글로벌 단축키 — 맥 KeyboardHotkeyHandler와 동일 키(모두 ⌃⌥). 다른 앱과 충돌하는 키는
-        // 그 키만 건너뛰고 나머지는 등록(TryRegisterHotkey). 라디얼(⌃⌥,)은 Windows Terminal 충돌로
-        // 가운데 버튼이 대신한다.
-        TryRegisterHotkey("D", ToggleDrawingMode);   // 그리기 모드
-        TryRegisterHotkey("I", ToggleInspector);     // 좌표 표시
-        TryRegisterHotkey("S", ToggleSpotlight);     // 스포트라이트
-        TryRegisterHotkey("M", ToggleMagnifier);     // 돋보기
-        TryRegisterHotkey("K", ToggleKeystroke);     // 키 입력 표시
-        TryRegisterHotkey("C", CycleColor);          // 링 색 순환
-        TryRegisterHotkey("H", CycleRingShape);      // 링 모양 순환
-        // ⌃⌥. 라디얼 토글은 RadialChordDetector(LL 후킹)가 처리 — RegisterHotKey 미사용.
-        // ⌃⌥1~7 → 색 직접 지정 (맥과 동일 순서: 노랑/빨강/파랑/초록/하늘/보라/흰).
-        for (int n = 0; n < ColorPalette.Length && n < 7; n++)
-        {
-            var color = ColorPalette[n];
-            TryRegisterHotkey(((char)('1' + n)).ToString(), () => SetRingColor(color));
-        }
+        RegisterHotkeys();      // 설정의 단축키 키로 등록
 
         _mouse.ButtonDown += OnButtonDown;
         _mouse.ButtonUp += OnButtonUp;
@@ -484,6 +467,7 @@ public sealed class OverlayCoordinator : IDisposable
     private void OnSettingsChanged()
     {
         ApplyRuntimeSettings();
+        if (HotkeySignature() != _hkSig) RegisterHotkeys(); // 단축키 키 변경 시 재등록
         _settings.Save(_store); // 플랫폼 구현이 디바운스
     }
 
@@ -748,6 +732,39 @@ public sealed class OverlayCoordinator : IDisposable
     /// <summary>등록에 실패한(충돌난) ⌃⌥ 단축키 키 목록 — 진단/안내용.</summary>
     public IReadOnlyList<string> FailedHotkeys => _failedHotkeys;
     private readonly List<string> _failedHotkeys = new();
+    private string _hkSig = ""; // 현재 등록된 사용자 지정 키 시그니처(변경 감지용)
+
+    // 사용자 지정 키(그리기·좌표·스포트라이트·돋보기·키입력) 시그니처. 바뀌면 RegisterHotkeys 재실행.
+    private string HotkeySignature() => string.Join("|",
+        _settingsModel.HotkeyDrawing, _settingsModel.HotkeyInspector, _settingsModel.HotkeySpotlight,
+        _settingsModel.HotkeyMagnifier, _settingsModel.HotkeyKeystroke);
+
+    /// <summary>
+    /// 글로벌 단축키 등록(전부 ⌃⌥). 사용자 지정 5종은 설정 키로, 색 순환·번호는 고정 키로.
+    /// 라디얼(⌃⌥.)은 RadialChordDetector(LL 후킹)가 처리 — 여기서 등록하지 않는다.
+    /// 재호출 시 기존 등록을 모두 해제하고 다시 등록(키 변경 반영).
+    /// </summary>
+    private void RegisterHotkeys()
+    {
+        foreach (var r in _hotkeyRegs) r.Dispose();
+        _hotkeyRegs.Clear();
+        _failedHotkeys.Clear();
+
+        TryRegisterHotkey(_settingsModel.HotkeyDrawing, ToggleDrawingMode);   // 그리기 모드
+        TryRegisterHotkey(_settingsModel.HotkeyInspector, ToggleInspector);   // 좌표 표시
+        TryRegisterHotkey(_settingsModel.HotkeySpotlight, ToggleSpotlight);   // 스포트라이트
+        TryRegisterHotkey(_settingsModel.HotkeyMagnifier, ToggleMagnifier);   // 돋보기
+        TryRegisterHotkey(_settingsModel.HotkeyKeystroke, ToggleKeystroke);   // 키 입력 표시
+        TryRegisterHotkey("C", CycleColor);                                   // 링 색 순환(고정)
+        TryRegisterHotkey("H", CycleRingShape);                               // 링 모양 순환(고정)
+        // ⌃⌥1~7 → 색 직접 지정 (맥과 동일 순서: 노랑/빨강/파랑/초록/하늘/보라/흰).
+        for (int n = 0; n < ColorPalette.Length && n < 7; n++)
+        {
+            var color = ColorPalette[n];
+            TryRegisterHotkey(((char)('1' + n)).ToString(), () => SetRingColor(color));
+        }
+        _hkSig = HotkeySignature();
+    }
 
     /// <summary>⌃⌥{key} 핫키 등록 — 다른 앱과 충돌하면 그 키만 건너뛴다(예외 삼킴).</summary>
     private void TryRegisterHotkey(string key, Action onPressed)

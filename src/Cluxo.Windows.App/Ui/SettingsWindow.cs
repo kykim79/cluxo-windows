@@ -50,10 +50,10 @@ internal sealed class SettingsWindow : Window
     /// <summary>설정 컨트롤 패널 — Window 콘텐츠 + 셀프테스트 렌더 공용(Window 부모 없이 렌더 가능).</summary>
     internal static FrameworkElement BuildPanel(CursorSettings s, ILaunchAtLogin launch)
     {
-        var titles = new[] { "링", "효과", "모드", "일반" };
+        var titles = new[] { "링", "효과", "모드", "단축키", "일반" };
         var tabs = new FrameworkElement[]
         {
-            RingTab(s), EffectsTab(s), ModesTab(s), GeneralTab(s, launch),
+            RingTab(s), EffectsTab(s), ModesTab(s), ShortcutsTab(s), GeneralTab(s, launch),
         };
         foreach (var t in tabs) t.Margin = new Thickness(16, 6, 16, 16);
 
@@ -120,21 +120,71 @@ internal sealed class SettingsWindow : Window
         return p;
     }
 
+    private static FrameworkElement ShortcutsTab(CursorSettings s)
+    {
+        var p = new StackPanel();
+        p.Children.Add(Card(
+            ("그리기 모드", KeyRecorder(s.HotkeyDrawing, v => s.HotkeyDrawing = v)),
+            ("좌표 표시", KeyRecorder(s.HotkeyInspector, v => s.HotkeyInspector = v)),
+            ("스포트라이트", KeyRecorder(s.HotkeySpotlight, v => s.HotkeySpotlight = v)),
+            ("돋보기", KeyRecorder(s.HotkeyMagnifier, v => s.HotkeyMagnifier = v)),
+            ("키 입력 표시", KeyRecorder(s.HotkeyKeystroke, v => s.HotkeyKeystroke = v))));
+        p.Children.Add(Note("모든 단축키는 Ctrl+Alt 조합. 항목을 누르고 새 키를 누르면 바뀝니다 (ESC 취소)."));
+        p.Children.Add(Note(
+            "고정 단축키\n" +
+            "Ctrl+Alt+.  라디얼 메뉴 (가운데 버튼도 가능)\n" +
+            "Ctrl+Alt+C / H  색 · 모양 순환\n" +
+            "Ctrl+Alt+1~7  색 직접 선택"));
+        return p;
+    }
+
     private static FrameworkElement GeneralTab(CursorSettings s, ILaunchAtLogin launch)
     {
         var p = new StackPanel();
         p.Children.Add(Card(
             ("언어", SegEnum(s.PreferredLanguage, v => s.PreferredLanguage = v, v => v.Label())),
             ("로그인 시 실행", Switch(launch.IsEnabled, v => launch.IsEnabled = v))));
-        p.Children.Add(Note(
-            "Ctrl+Alt+D  그리기 모드\n" +
-            "Ctrl+Alt+.  라디얼 메뉴 (가운데 버튼도 가능)\n" +
-            "Ctrl+Alt+I  좌표 표시\n" +
-            "Ctrl+Alt+S / M / K  스포트라이트 / 돋보기 / 키 입력\n" +
-            "Ctrl+Alt+C / H  색 · 모양 순환\n" +
-            "Ctrl+Alt+1~7  색 직접 선택"));
         return p;
     }
+
+    // ── 키 레코더 — 클릭 후 키를 누르면 그 키로 재지정(모디파이어 Ctrl+Alt 고정) ──
+    private static FrameworkElement KeyRecorder(string current, Action<string> onChange)
+    {
+        string cur = current;
+        bool capturing = false;
+        var txt = new TextBlock { VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, FontSize = 12, FontWeight = FontWeights.SemiBold, Foreground = TextPrimary };
+        var box = new Border
+        {
+            Child = txt, Background = SegTrack, CornerRadius = new CornerRadius(7), Padding = new Thickness(12, 5, 12, 5),
+            Cursor = Cursors.Hand, Focusable = true, HorizontalAlignment = HorizontalAlignment.Right, MinWidth = 78,
+        };
+        void Render() { txt.Text = capturing ? "키 입력…" : "Ctrl+Alt+" + KeyDisplay(cur); box.Background = capturing ? Accent : SegTrack; txt.Foreground = capturing ? ThumbBg : TextPrimary; }
+        Render();
+        box.MouseLeftButtonUp += (_, _) => { capturing = true; Render(); Keyboard.Focus(box); };
+        box.LostKeyboardFocus += (_, _) => { if (capturing) { capturing = false; Render(); } };
+        box.PreviewKeyDown += (_, e) =>
+        {
+            if (!capturing) return;
+            e.Handled = true;
+            var key = e.Key == Key.System ? e.SystemKey : e.Key;
+            if (IsModifier(key)) return;
+            if (key == Key.Escape) { capturing = false; Render(); return; }
+            if (KeyToName(key) is { } name) { cur = name; onChange(name); capturing = false; Render(); }
+        };
+        return box;
+    }
+
+    private static bool IsModifier(Key k) => k is Key.LeftCtrl or Key.RightCtrl or Key.LeftAlt or Key.RightAlt
+        or Key.LeftShift or Key.RightShift or Key.LWin or Key.RWin or Key.System;
+
+    private static string? KeyToName(Key k)
+    {
+        if (k >= Key.A && k <= Key.Z) return ((char)('A' + (k - Key.A))).ToString();
+        if (k >= Key.D0 && k <= Key.D9) return ((char)('0' + (k - Key.D0))).ToString();
+        return k switch { Key.OemPeriod => "Period", Key.OemComma => "Comma", _ => null };
+    }
+
+    private static string KeyDisplay(string name) => name switch { "Period" => ".", "Comma" => ",", _ => name };
 
     // ── 그룹 카드 + 라벨 좌측 행 ────────────────────────────────
     private static FrameworkElement Card(params (string Label, FrameworkElement Control)[] rows)
