@@ -698,10 +698,10 @@ internal sealed class OverlayElement : FrameworkElement
     // paintpalette.fill / square.on.circle / ruler.fill / keyboard.fill
     private void DrawSectorIcon(DrawingContext dc, RadialMenuItem item, Point p, Rgba color)
     {
-        var pen = StrokePen(color, 1.7);
-        var thin = StrokePen(color, 1.25);
+        var pen = StrokePen(color, 2.0);
+        var thin = StrokePen(color, 1.5);
         var fill = MakeBrush(color, 1.0);
-        const double u = 9;
+        const double u = 12;
         switch (item)
         {
             case RadialMenuItem.Spotlight: // flashlight.on.fill — 손전등 머리+몸체+빛
