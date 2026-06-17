@@ -94,6 +94,30 @@ internal static class Program
             coordinator.MouseHookLost += () => Log("HOOK REMOVED (reinstalled)");
         }
 
+        // 핫키 등록 결과를 시작 시 기록(키 입력 불필요) — ⌃⌥D 등이 다른 앱과 충돌해 비활성됐는지 확인용.
+        try
+        {
+            var hkLog = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "cluxo-hotkeys.log");
+            var failed = coordinator.FailedHotkeys;
+            System.IO.File.WriteAllText(hkLog,
+                $"{DateTime.Now:HH:mm:ss} hotkey registration\n" +
+                (failed.Count == 0
+                    ? "all Ctrl+Alt hotkeys registered OK (D,I,S,M,K,C,H,1-7)\n"
+                    : $"FAILED (다른 앱이 선점): {string.Join(", ", failed)}\n"));
+        }
+        catch { }
+
+        // 진단 — 그리기 모드 토글이 실제로 호출되는지 기록(⌃⌥D / 트레이 / ✕).
+        coordinator.DrawingModeChanged += active =>
+        {
+            try
+            {
+                var p = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "cluxo-draw.log");
+                System.IO.File.AppendAllText(p, $"{DateTime.Now:HH:mm:ss.fff} drawing={(active ? "ON" : "OFF")}\n");
+            }
+            catch { }
+        };
+
         using var exit = new ManualResetEventSlim(false);
 
         // T2: 마우스 후킹 분실 → 재설치됨을 트레이 풍선으로 알림.

@@ -492,16 +492,21 @@ public sealed class OverlayCoordinator : IDisposable
         return isDouble;
     }
 
+    /// <summary>그리기 모드가 토글될 때마다 발생(진단/트레이 체크 갱신용). 인자는 활성 여부.</summary>
+    public event Action<bool>? DrawingModeChanged;
+
     /// <summary>그리기 모드 토글 (⌃⌥D 핫키 + 트레이 메뉴 공용).</summary>
     public void ToggleDrawingMode()
     {
         double now = _clock.NowSeconds;
+        bool active;
         lock (_gate)
         {
             _drawing.ToggleMode();
-            _keystrokes.ShowStatusNotification(
-                _drawing.IsDrawingModeActive ? "그리기 모드 ON" : "그리기 모드 OFF", now);
+            active = _drawing.IsDrawingModeActive;
+            _keystrokes.ShowStatusNotification(active ? "그리기 모드 ON" : "그리기 모드 OFF", now);
         }
+        DrawingModeChanged?.Invoke(active);
     }
 
     private void OnButtonDown(MouseButton button, PointD point)
@@ -728,6 +733,10 @@ public sealed class OverlayCoordinator : IDisposable
     private static readonly RingColor[] ColorPalette =
         Enum.GetValues<RingColor>().Where(c => c != RingColor.Custom).ToArray();
 
+    /// <summary>등록에 실패한(충돌난) ⌃⌥ 단축키 키 목록 — 진단/안내용.</summary>
+    public IReadOnlyList<string> FailedHotkeys => _failedHotkeys;
+    private readonly List<string> _failedHotkeys = new();
+
     /// <summary>⌃⌥{key} 핫키 등록 — 다른 앱과 충돌하면 그 키만 건너뛴다(예외 삼킴).</summary>
     private void TryRegisterHotkey(string key, Action onPressed)
     {
@@ -738,7 +747,7 @@ public sealed class OverlayCoordinator : IDisposable
         }
         catch (Exception)
         {
-            // 충돌(InvalidOperationException) 등 — 해당 단축키만 비활성, 나머지는 유지.
+            _failedHotkeys.Add(key); // 충돌(InvalidOperationException) 등 — 그 키만 비활성, 나머지는 유지.
         }
     }
 
