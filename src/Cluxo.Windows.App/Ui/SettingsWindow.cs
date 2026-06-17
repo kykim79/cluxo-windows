@@ -8,6 +8,7 @@ using System.Windows.Media;
 using System.Windows.Media.Effects;
 using Cluxo.Core;
 using Cluxo.Core.Platform;
+using Cluxo.Windows.App.Update;
 
 namespace Cluxo.Windows.App.Ui;
 
@@ -146,8 +147,92 @@ internal sealed class SettingsWindow : Window
         p.Children.Add(Card(
             ("언어", SegEnum(s.PreferredLanguage, v => s.PreferredLanguage = v, v => v.Label())),
             ("로그인 시 실행", Switch(launch.IsEnabled, v => launch.IsEnabled = v))));
+        p.Children.Add(UpdateSection(s));
         return p;
     }
+
+    // ── 업데이트 (직접 배포 — 매니페스트 확인 + 설치본 다운로드·실행) ──
+    private static FrameworkElement UpdateSection(CursorSettings s)
+    {
+        var status = new TextBlock { Foreground = TextMuted, FontSize = 12, TextWrapping = TextWrapping.Wrap, LineHeight = 18, Margin = new Thickness(0, 9, 0, 0) };
+        var checkBtn = PillButton("업데이트 확인", primary: false);
+        var updateBtn = PillButton("지금 업데이트", primary: true);
+        updateBtn.Visibility = Visibility.Collapsed;
+
+        string? downloadUrl = null;
+        bool busy = false;
+
+        async void Check()
+        {
+            if (busy) return;
+            busy = true; updateBtn.Visibility = Visibility.Collapsed;
+            status.Foreground = TextMuted; status.Text = "확인 중...";
+            var r = await UpdateService.CheckAsync(s.UpdateManifestUrl);
+            busy = false;
+            switch (r.Status)
+            {
+                case UpdateStatus.UpToDate:
+                    status.Text = $"✓ 최신 버전입니다 (v{r.CurrentVersion})"; break;
+                case UpdateStatus.UpdateAvailable:
+                    downloadUrl = r.DownloadUrl;
+                    status.Text = $"새 버전 v{r.LatestVersion} 사용 가능 (현재 v{r.CurrentVersion})"
+                        + (string.IsNullOrWhiteSpace(r.Notes) ? "" : $"\n{r.Notes}");
+                    if (!string.IsNullOrWhiteSpace(downloadUrl)) updateBtn.Visibility = Visibility.Visible;
+                    break;
+                case UpdateStatus.LocalAhead:
+                    status.Text = $"로컬 버전(v{r.CurrentVersion})이 최신(v{r.LatestVersion})보다 높습니다 — 개발 빌드"; break;
+                default:
+                    status.Text = $"확인 실패: {r.Error}"; break;
+            }
+        }
+
+        async void DoUpdate()
+        {
+            if (busy || string.IsNullOrWhiteSpace(downloadUrl)) return;
+            busy = true; updateBtn.Visibility = Visibility.Collapsed;
+            status.Text = "다운로드 중... 0%";
+            var prog = new Progress<double>(pc => status.Text = $"다운로드 중... {(int)(pc * 100)}%");
+            try
+            {
+                var path = await UpdateService.DownloadInstallerAsync(downloadUrl!, prog);
+                status.Text = "설치 프로그램 실행 — 곧 종료됩니다...";
+                if (path is not null) { UpdateService.RunInstaller(path); Environment.Exit(0); }
+            }
+            catch (Exception ex) { busy = false; status.Text = $"다운로드 실패: {ex.Message}"; }
+        }
+
+        checkBtn.MouseLeftButtonUp += (_, _) => Check();
+        updateBtn.MouseLeftButtonUp += (_, _) => DoUpdate();
+
+        var btnRow = new StackPanel { Orientation = Orientation.Horizontal };
+        updateBtn.Margin = new Thickness(8, 0, 0, 0);
+        btnRow.Children.Add(checkBtn);
+        btnRow.Children.Add(updateBtn);
+
+        var content = new StackPanel();
+        content.Children.Add(Row("현재 버전", new TextBlock
+        {
+            Text = "v" + UpdateService.CurrentVersion, VerticalAlignment = VerticalAlignment.Center,
+            HorizontalAlignment = HorizontalAlignment.Right, Foreground = TextPrimary, FontSize = 13,
+        }));
+        content.Children.Add(new Border { Height = 1, Background = DividerBrush, Margin = new Thickness(-14, 0, -14, 8) });
+        content.Children.Add(btnRow);
+        content.Children.Add(status);
+
+        return new Border
+        {
+            Background = CardBg, BorderBrush = CardBorder, BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(10), Padding = new Thickness(14, 10, 14, 12),
+            Child = content, Margin = new Thickness(0, 0, 0, 12),
+        };
+    }
+
+    private static Border PillButton(string text, bool primary) => new()
+    {
+        Background = primary ? Accent : SegTrack, CornerRadius = new CornerRadius(7),
+        Padding = new Thickness(14, 6, 14, 6), Cursor = Cursors.Hand, HorizontalAlignment = HorizontalAlignment.Left,
+        Child = new TextBlock { Text = text, FontSize = 12, FontWeight = FontWeights.SemiBold, Foreground = primary ? ThumbBg : TextPrimary },
+    };
 
     /// <summary>한 번에 한 레코더만 캡처하도록 공유하는 상태(직전 캡처 중지).</summary>
     private sealed class CaptureState { public Action? StopActive; }
