@@ -223,6 +223,25 @@ public class OverlayCoordinatorTests
     }
 
     [Fact]
+    public void Drawing_KeyUpClearsModifiers_UsesSelectedTool()
+    {
+        // ⌃⌥D로 켠 뒤 모디파이어 키를 떼면(key-up KeyEvent) _modifiers가 비워져,
+        // 그리기가 ToolFor(모디파이어) 대신 툴바 SelectedTool(기본 Pen)을 쓴다. (도구/굵기 안 먹던 버그)
+        var h = new Harness();
+        h.Coordinator.Start();
+        h.EnterDrawingMode();
+        h.Keyboard.Press(new KeyEvent(KeyModifiers.Control | KeyModifiers.Alt, null, null)); // 모디파이어 눌림
+        h.Keyboard.Press(new KeyEvent(KeyModifiers.None, null, null));                        // 떼임 → 비움
+
+        h.Mouse.Down(MouseButton.Left, new PointD(10, 10));
+        h.Cursor.Position = new PointD(60, 60); h.Coordinator.RenderFrame();
+        h.Mouse.Up(MouseButton.Left, new PointD(60, 60));
+
+        Assert.Single(h.Coordinator.DrawingShapes);
+        Assert.Equal(DrawingTool.Pen, h.Coordinator.DrawingShapes[0].Tool); // 형광펜(ToolFor(⌃⌥)) 아님
+    }
+
+    [Fact]
     public void RenderFrame_CursorOnlyOnContainingMonitor()
     {
         var h = new Harness(Harness.MonA, Harness.MonB);

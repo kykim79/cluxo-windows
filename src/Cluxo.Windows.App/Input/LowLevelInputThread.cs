@@ -238,12 +238,19 @@ internal sealed class LowLevelInputThread : IDisposable
                     case ChordEdge.Closed: RadialClosed?.Invoke(); break; // 떼임 — 토글 모델이라 사용 안 함(facade 호환)
                 }
 
-                // 키스트로크 오버레이는 down에서만 표시(게이트는 Core KeyFormat이 처리)
                 if (ev.KeyDown)
                 {
+                    // 키스트로크 오버레이는 down에서만 표시(게이트는 Core KeyFormat이 처리)
                     var special = VirtualKeys.MapSpecial(ev.Vk);
                     string? chars = special is null ? VirtualKeys.MapChar(ev.Vk) : null;
                     KeyPressed?.Invoke(new KeyEvent(mods, special, chars));
+                }
+                else
+                {
+                    // 키 뗌 — 모디파이어 상태만 갱신(그리기 도구 modifier 추적). special/chars 없어
+                    // KeyFormat이 ""을 반환하므로 키스트로크는 안 뜬다. (⌃⌥D로 켠 뒤 모디파이어가
+                    // 고정돼 ToolFor가 툴바 선택을 덮어쓰던 버그 수정.)
+                    KeyPressed?.Invoke(new KeyEvent(mods, null, null));
                 }
                 break;
         }
