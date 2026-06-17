@@ -693,54 +693,105 @@ internal sealed class OverlayElement : FrameworkElement
     private void FillWedge(DrawingContext dc, Point center, double r0, double r1, double cwCenter, double cwHalf, Brush fill, Pen stroke)
         => dc.DrawGeometry(fill, stroke, PieWedge(center, r0, r1, (cwCenter - cwHalf) - 90, (cwCenter + cwHalf) - 90));
 
-    // 메인 sector 벡터 아이콘 (맥 SF Symbol 대응 — 폰트 tofu 회피용 직접 그림). p 중심, 약 ±9px.
+    // 메인 sector 벡터 아이콘 — 맥 SF Symbol에 맞춰 직접 그림(폰트 tofu 회피). p 중심, 약 ±9px.
+    // flashlight.on.fill / plus.magnifyingglass / sparkles / circle.dashed /
+    // paintpalette.fill / square.on.circle / ruler.fill / keyboard.fill
     private void DrawSectorIcon(DrawingContext dc, RadialMenuItem item, Point p, Rgba color)
     {
         var pen = StrokePen(color, 1.7);
+        var thin = StrokePen(color, 1.25);
         var fill = MakeBrush(color, 1.0);
         const double u = 9;
         switch (item)
         {
-            case RadialMenuItem.Spotlight: // 빛/타겟 — 원 + 중심점 + 광선
-                dc.DrawEllipse(null, pen, p, u * 0.5, u * 0.5);
-                dc.DrawEllipse(fill, null, p, u * 0.16, u * 0.16);
-                for (int k = 0; k < 8; k++)
+            case RadialMenuItem.Spotlight: // flashlight.on.fill — 손전등 머리+몸체+빛
+            {
+                var head = new StreamGeometry();
+                using (var g = head.Open())
                 {
-                    double a = k * 45 * Math.PI / 180;
-                    dc.DrawLine(pen, new Point(p.X + Math.Cos(a) * u * 0.72, p.Y + Math.Sin(a) * u * 0.72),
-                        new Point(p.X + Math.Cos(a) * u, p.Y + Math.Sin(a) * u));
+                    g.BeginFigure(new Point(p.X - u * 0.45, p.Y - u * 0.18), true, true);
+                    g.LineTo(new Point(p.X + u * 0.45, p.Y - u * 0.18), true, false);
+                    g.LineTo(new Point(p.X + u * 0.3, p.Y + u * 0.12), true, false);
+                    g.LineTo(new Point(p.X - u * 0.3, p.Y + u * 0.12), true, false);
                 }
+                head.Freeze();
+                dc.DrawGeometry(fill, null, head);
+                dc.DrawRoundedRectangle(fill, null, new Rect(p.X - u * 0.3, p.Y + u * 0.12, u * 0.6, u * 0.66), 1.3, 1.3);
+                for (int k = -1; k <= 1; k++) // 빛
+                    dc.DrawLine(thin, new Point(p.X + k * u * 0.3, p.Y - u * 0.34), new Point(p.X + k * u * 0.46, p.Y - u * 0.74));
                 break;
-            case RadialMenuItem.Magnifier: // 돋보기 — 원 + 손잡이
-                dc.DrawEllipse(null, pen, new Point(p.X - u * 0.25, p.Y - u * 0.25), u * 0.55, u * 0.55);
-                dc.DrawLine(pen, new Point(p.X + u * 0.2, p.Y + u * 0.2), new Point(p.X + u * 0.85, p.Y + u * 0.85));
+            }
+            case RadialMenuItem.Magnifier: // plus.magnifyingglass — 렌즈 + 플러스 + 손잡이
+            {
+                var lc = new Point(p.X - u * 0.18, p.Y - u * 0.18);
+                double lr = u * 0.55;
+                dc.DrawEllipse(null, pen, lc, lr, lr);
+                dc.DrawLine(thin, new Point(lc.X - lr * 0.5, lc.Y), new Point(lc.X + lr * 0.5, lc.Y));
+                dc.DrawLine(thin, new Point(lc.X, lc.Y - lr * 0.5), new Point(lc.X, lc.Y + lr * 0.5));
+                dc.DrawLine(StrokePen(color, 2.2), new Point(p.X + u * 0.3, p.Y + u * 0.3), new Point(p.X + u * 0.88, p.Y + u * 0.88));
                 break;
-            case RadialMenuItem.Glow: // 효과 — 4점 반짝임 + 작은 별
-                Sparkle(dc, new Point(p.X - u * 0.15, p.Y - u * 0.1), u * 0.7, fill);
-                Sparkle(dc, new Point(p.X + u * 0.55, p.Y + u * 0.5), u * 0.32, fill);
+            }
+            case RadialMenuItem.Glow: // sparkles — 큰 별 + 작은 별 둘
+                Sparkle(dc, new Point(p.X - u * 0.15, p.Y - u * 0.12), u * 0.72, fill);
+                Sparkle(dc, new Point(p.X + u * 0.55, p.Y + u * 0.5), u * 0.34, fill);
+                Sparkle(dc, new Point(p.X + u * 0.48, p.Y - u * 0.55), u * 0.26, fill);
                 break;
-            case RadialMenuItem.RingSize: // 링 외형 — 이중 원
-                dc.DrawEllipse(null, pen, p, u * 0.85, u * 0.85);
-                dc.DrawEllipse(null, StrokePen(color, 1.2), p, u * 0.45, u * 0.45);
+            case RadialMenuItem.RingSize: // circle.dashed — 점선 원
+                dc.DrawEllipse(null, DashedPen(color, 1.8), p, u * 0.8, u * 0.8);
                 break;
-            case RadialMenuItem.Color: // 링 색 — 채운 원(스와치)
-                dc.DrawEllipse(fill, null, p, u * 0.7, u * 0.7);
+            case RadialMenuItem.Color: // paintpalette.fill — 팔레트 + 엄지구멍 + 물감 wells(EvenOdd 구멍)
+            {
+                var palette = new GeometryGroup { FillRule = FillRule.EvenOdd };
+                palette.Children.Add(new EllipseGeometry(p, u * 0.9, u * 0.74));
+                palette.Children.Add(new EllipseGeometry(new Point(p.X + u * 0.45, p.Y + u * 0.2), u * 0.17, u * 0.17));
+                palette.Children.Add(new EllipseGeometry(new Point(p.X - u * 0.4, p.Y - u * 0.28), u * 0.14, u * 0.14));
+                palette.Children.Add(new EllipseGeometry(new Point(p.X - u * 0.55, p.Y + u * 0.18), u * 0.14, u * 0.14));
+                palette.Children.Add(new EllipseGeometry(new Point(p.X + u * 0.02, p.Y - u * 0.42), u * 0.14, u * 0.14));
+                palette.Freeze();
+                dc.DrawGeometry(fill, null, palette);
                 break;
-            case RadialMenuItem.RingShape: // 링 모양 — 사각 + 원 겹침
-                dc.DrawRectangle(null, pen, new Rect(p.X - u * 0.85, p.Y - u * 0.55, u * 1.0, u * 1.0));
-                dc.DrawEllipse(null, pen, new Point(p.X + u * 0.25, p.Y + u * 0.1), u * 0.5, u * 0.5);
+            }
+            case RadialMenuItem.RingShape: // square.on.circle — 원(뒤) + 둥근 사각(앞, 채움)
+                dc.DrawEllipse(null, pen, new Point(p.X + u * 0.28, p.Y + u * 0.3), u * 0.5, u * 0.5);
+                dc.DrawRoundedRectangle(fill, null, new Rect(p.X - u * 0.85, p.Y - u * 0.82, u * 0.95, u * 0.95), 1.5, 1.5);
                 break;
-            case RadialMenuItem.Inspector: // 좌표/각도 — 십자선
-                dc.DrawLine(pen, new Point(p.X - u, p.Y), new Point(p.X + u, p.Y));
-                dc.DrawLine(pen, new Point(p.X, p.Y - u), new Point(p.X, p.Y + u));
-                dc.DrawEllipse(null, StrokePen(color, 1.2), p, u * 0.3, u * 0.3);
+            case RadialMenuItem.Inspector: // ruler.fill — 대각 자 + 눈금 노치(EvenOdd)
+            {
+                dc.PushTransform(new RotateTransform(-32, p.X, p.Y));
+                var ruler = new GeometryGroup { FillRule = FillRule.EvenOdd };
+                ruler.Children.Add(new RectangleGeometry(new Rect(p.X - u, p.Y - u * 0.32, u * 2, u * 0.64), 1.4, 1.4));
+                for (int k = 0; k < 5; k++)
+                {
+                    double x = p.X - u + u * 0.42 + k * u * 0.4;
+                    double h = (k % 2 == 0) ? u * 0.34 : u * 0.2;
+                    ruler.Children.Add(new RectangleGeometry(new Rect(x - 0.6, p.Y + u * 0.32 - h, 1.2, h)));
+                }
+                ruler.Freeze();
+                dc.DrawGeometry(fill, null, ruler);
+                dc.Pop();
                 break;
-            case RadialMenuItem.Keystroke: // 키 입력 — 키캡(둥근 사각) + 점들
-                dc.DrawRoundedRectangle(null, pen, new Rect(p.X - u, p.Y - u * 0.65, u * 2, u * 1.3), 2, 2);
-                for (int k = -1; k <= 1; k++)
-                    dc.DrawEllipse(fill, null, new Point(p.X + k * u * 0.5, p.Y), u * 0.12, u * 0.12);
+            }
+            case RadialMenuItem.Keystroke: // keyboard.fill — 본체 + 키 + 스페이스바
+                dc.DrawRoundedRectangle(null, pen, new Rect(p.X - u, p.Y - u * 0.62, u * 2, u * 1.24), 2, 2);
+                for (int row = 0; row < 2; row++)
+                    for (int col = -2; col <= 2; col++)
+                        dc.DrawEllipse(fill, null, new Point(p.X + col * u * 0.38, p.Y - u * 0.24 + row * u * 0.32), u * 0.1, u * 0.1);
+                dc.DrawRoundedRectangle(fill, null, new Rect(p.X - u * 0.45, p.Y + u * 0.28, u * 0.9, u * 0.18), 1, 1);
                 break;
         }
+    }
+
+    // 점선 펜 — circle.dashed 등. (Freeze로 핫패스 안전)
+    private Pen DashedPen(Rgba color, double width)
+    {
+        var pen = new Pen(MakeBrush(color, 1.0), width)
+        {
+            DashStyle = new DashStyle(new double[] { 2.2, 1.6 }, 0),
+            StartLineCap = PenLineCap.Round,
+            EndLineCap = PenLineCap.Round,
+        };
+        pen.Freeze();
+        return pen;
     }
 
     private void Sparkle(DrawingContext dc, Point p, double r, Brush fill)
