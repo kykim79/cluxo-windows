@@ -145,22 +145,22 @@ internal sealed class SettingsWindow : Window
     {
         var p = new StackPanel();
         p.Children.Add(Card(("표시 언어", SegEnum(s.PreferredLanguage, v => s.PreferredLanguage = v, v => v.Label()))));
-        p.Children.Add(Note("표시 언어는 변경 후 Cluxo를 재시작해야 적용됩니다. '시스템 기본'은 Windows 시스템 언어를 따릅니다."));
+        p.Children.Add(Note("변경 후 재시작해야 적용됩니다."));
 
         // 시작 — 로그인 시 실행 + 발표/녹화 앱 자동 활성화
         p.Children.Add(Card(
             ("로그인 시 실행", Switch(launch.IsEnabled, v => launch.IsEnabled = v)),
             ("자동 활성화", Switch(s.IsAutoActivateEnabled, v => s.IsAutoActivateEnabled = v))));
-        p.Children.Add(Note("발표·녹화·회의 앱(Zoom·OBS·Teams·PowerPoint 등)이 켜질 때 Cluxo가 자동으로 활성화됩니다."));
+        p.Children.Add(Note("Zoom·OBS·PowerPoint 등이 켜지면 자동으로 활성화."));
 
         // 커서 — 숨김 대기(링 페이드)
         p.Children.Add(Card(("숨김 대기", SliderRow(s.RingHideSeconds, 0, 10, 0.5,
             v => s.RingHideSeconds = v, v => v <= 0 ? "끔" : $"{v:0.0}초"))));
-        p.Children.Add(Note("마우스를 안 움직이면 링이 페이드 아웃되기까지 대기 시간. 발표 중엔 길게(5초+) 권장. 끔=항상 표시."));
+        p.Children.Add(Note("안 움직이면 링이 사라지는 시간. 0=항상 표시."));
 
         // 스크린샷 모드 — 외부 캡처에서 오버레이 제외(WDA)
         p.Children.Add(Card(("스크린샷 모드", Switch(s.IsScreenshotMode, v => s.IsScreenshotMode = v))));
-        p.Children.Add(Note("켜면 외부 캡처(스크린샷·OBS)에서 Cluxo 오버레이를 제외합니다 — 깨끗한 화면 캡처용. 앱 재시작 시 자동 해제."));
+        p.Children.Add(Note("외부 캡처(OBS·스크린샷)에서 오버레이 제외. 재시작 시 해제."));
 
         p.Children.Add(AppInfoSection());
         p.Children.Add(UpdateSection(s));
