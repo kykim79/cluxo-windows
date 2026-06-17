@@ -581,13 +581,13 @@ public class OverlayCoordinatorTests
     [Fact]
     public void Ring_UsesSettings_ColorSizeOpacity()
     {
-        var h = new Harness(); // 기본: Cyan, Medium(54)
+        var h = new Harness(); // 기본: Red, Medium(54)
         h.Coordinator.Start();
         h.Cursor.Position = new PointD(100, 100); // 모니터 A
         h.Coordinator.RenderFrame();
         var ring = h.Factory.Created["A"].Last!.Value.Ring;
         Assert.NotNull(ring);
-        Assert.Equal(RingColor.Cyan.Color(), ring!.Value.Color);
+        Assert.Equal(RingColor.Red.Color(), ring!.Value.Color);
         Assert.Equal(RingSize.Medium.Diameter() / 2, ring.Value.Radius); // 27
         Assert.Equal(1.0, ring.Value.Opacity);
         Assert.Equal(RingShape.Circle, ring.Value.Shape);                 // 기본 모양

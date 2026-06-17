@@ -22,7 +22,7 @@ public sealed class CursorSettings
     private void Set<T>(string key, T value) { _store.Set(key, value); Changed?.Invoke(); }
 
     // ── 링 외형 ──────────────────────────────────────────────────
-    public RingColor RingColor { get => Get("ringColor", RingColor.Cyan); set => Set("ringColor", value); }
+    public RingColor RingColor { get => Get("ringColor", RingColor.Red); set => Set("ringColor", value); }
     public RingShape RingShape { get => Get("ringShape", RingShape.Circle); set => Set("ringShape", value); }
     public RingSize RingSize { get => Get("ringSize", RingSize.Medium); set => Set("ringSize", value); }
     public double RingOpacity { get => Get("ringOpacity", 1.0); set => Set("ringOpacity", value); }

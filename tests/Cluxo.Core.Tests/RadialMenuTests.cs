@@ -63,7 +63,7 @@ public class RadialMenuTests
     {
         var s = DefaultSettings();
         var r = Runtime();
-        Assert.Equal("하늘색", RadialMenuItem.Color.CurrentValue(s, r));       // 기본 Cyan
+        Assert.Equal("빨간색", RadialMenuItem.Color.CurrentValue(s, r));       // 기본 Red
         Assert.Equal("보통 (54pt)", RadialMenuItem.RingSize.CurrentValue(s, r)); // Medium
         Assert.Equal("꺼짐", RadialMenuItem.Spotlight.CurrentValue(s, r));      // 비활성
         Assert.Equal("1/4 켜짐", RadialMenuItem.Glow.CurrentValue(s, r));       // idlePulse만 default on
@@ -72,12 +72,12 @@ public class RadialMenuTests
     }
 
     [Fact]
-    public void IsSubCurrent_Color_HighlightsCyan()
+    public void IsSubCurrent_Color_HighlightsRed()
     {
         var s = DefaultSettings();
         var r = Runtime();
-        // RingColor 순서 Yellow,Red,Blue,Green,Cyan,... → Cyan index 4
-        Assert.True(RadialMenuItem.Color.IsSubCurrent(4, s, r));
+        // RingColor 순서 Yellow,Red,Blue,Green,Cyan,... → 기본 Red index 1
+        Assert.True(RadialMenuItem.Color.IsSubCurrent(1, s, r));
         Assert.False(RadialMenuItem.Color.IsSubCurrent(0, s, r));
     }
 

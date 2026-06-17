@@ -69,7 +69,7 @@ public class CursorSettingsTests
     public void Defaults_MatchSwift()
     {
         var s = new CursorSettings(new JsonSettingsStore());
-        Assert.Equal(RingColor.Cyan, s.RingColor);
+        Assert.Equal(RingColor.Red, s.RingColor);
         Assert.Equal(RingShape.Circle, s.RingShape);
         Assert.Equal(RingSize.Medium, s.RingSize);
         Assert.Equal(1.0, s.RingOpacity);
@@ -103,7 +103,7 @@ public class CursorSettingsTests
     public void EffectiveRingColor_PresetVsCustom()
     {
         var s = new CursorSettings(new JsonSettingsStore());
-        Assert.Equal(RingColor.Cyan.Color(), s.EffectiveRingColor); // default Cyan
+        Assert.Equal(RingColor.Red.Color(), s.EffectiveRingColor); // default Red
         s.RingColor = RingColor.Custom;
         s.CustomRingColor = new Rgba(10, 20, 30);
         Assert.Equal(new Rgba(10, 20, 30), s.EffectiveRingColor);   // Custom → customRingColor
