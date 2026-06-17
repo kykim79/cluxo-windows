@@ -27,7 +27,7 @@
     <Company>Cluxo</Company>
     <Authors>kykim79</Authors>
     <Description>커서 강조 발표 도구 (macOS Cluxo의 네이티브 Windows 재구현)</Description>
-    <Version>1.0.1</Version>
+    <Version>1.0.2</Version>
     <Copyright>Copyright © 2026</Copyright>
   </PropertyGroup>
 
