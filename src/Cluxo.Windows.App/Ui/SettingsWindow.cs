@@ -273,6 +273,22 @@ internal sealed class SettingsWindow : Window
             ("자동 활성화", Switch(s.IsAutoActivateEnabled, v => s.IsAutoActivateEnabled = v))));
         p.Children.Add(Caption("Zoom·OBS·PowerPoint 등이 켜지면 자동으로 활성화."));
 
+        // 낯선 외장 모니터 자동 표시 + 신뢰 목록
+        p.Children.Add(Card(("낯선 모니터 자동 표시", Switch(s.IsAutoKeystrokeOnUnknownMonitor, v => s.IsAutoKeystrokeOnUnknownMonitor = v))));
+        p.Children.Add(Caption("처음 연결하는 외장 모니터(회의실 등)에 키 입력 표시 자동 ON. 자주 쓰는 모니터는 아래 신뢰 등록으로 제외."));
+        var monitors = Cluxo.Windows.App.Shell.MonitorIdentity.Connected();
+        if (monitors.Count > 0)
+        {
+            var rows = new (string, FrameworkElement)[monitors.Count];
+            for (int i = 0; i < monitors.Count; i++)
+            {
+                var (id, name) = monitors[i];
+                rows[i] = (name, Switch(s.IsTrustedMonitor(id), v => s.SetTrusted(id, v)));
+            }
+            p.Children.Add(Card(rows));
+            p.Children.Add(Caption("연결된 모니터 — 신뢰 ON이면 자동 표시에서 제외."));
+        }
+
         // 커서 — 숨김 대기(링 페이드)
         p.Children.Add(Card(("숨김 대기", SliderRow(s.RingHideSeconds, 0, 10, 0.5,
             v => s.RingHideSeconds = v, v => v <= 0 ? "끔" : $"{v:0.0}초"))));

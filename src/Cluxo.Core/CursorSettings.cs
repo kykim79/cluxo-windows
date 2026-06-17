@@ -1,4 +1,4 @@
-namespace Cluxo.Core;
+﻿namespace Cluxo.Core;
 
 /// <summary>
 /// 영구 사용자 설정 — <see cref="JsonSettingsStore"/> 백업 타입 접근자. (Swift <c>CursorSettings</c> 이식)
@@ -46,6 +46,10 @@ public sealed class CursorSettings
     // ── 효과 토글 (v1.0 minimalist default) ──────────────────────
     public bool IsGlowEnabled { get => Get("isGlowEnabled", false); set => Set("isGlowEnabled", value); }
     public bool IsKeystrokeEnabled { get => Get("isKeystrokeEnabled", false); set => Set("isKeystrokeEnabled", value); }
+
+    /// <summary>낯선(신뢰 목록에 없는) 외장 모니터 연결 시 키스트로크 표시 자동 ON — 발표·회의 감지. 기본 off.
+    /// (신뢰 목록은 아래 TrustedMonitorUUIDs / IsTrustedMonitor / SetTrusted 사용.)</summary>
+    public bool IsAutoKeystrokeOnUnknownMonitor { get => Get("autoKeystrokeUnknownMonitor", false); set => Set("autoKeystrokeUnknownMonitor", value); }
     public bool IsTrailEnabled { get => Get("isTrailEnabled", false); set => Set("isTrailEnabled", value); }
     public bool IsAnchoredLineEnabled { get => Get("isAnchoredLineEnabled", false); set => Set("isAnchoredLineEnabled", value); }
     public bool IsCometTailEnabled { get => Get("isCometTailEnabled", false); set => Set("isCometTailEnabled", value); }

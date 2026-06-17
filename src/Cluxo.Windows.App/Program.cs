@@ -169,6 +169,19 @@ internal static class Program
         // 활성/비활성 시 트레이 아이콘(회색)·툴팁 교체.
         coordinator.ActiveChanged += shell.Tray.SetActiveIcon;
 
+        // 낯선 외장 모니터 자동 키스트로크 — 신뢰 목록에 없는 모니터 연결 시 키스트로크 표시 강제 ON, 분리/신뢰 시 원복.
+        void EvaluateMonitors()
+        {
+            if (!coordinator.Settings.IsAutoKeystrokeOnUnknownMonitor) { coordinator.SetKeystrokeForced(false); return; }
+            bool anyUnknown = false;
+            foreach (var m in MonitorIdentity.Connected())
+                if (!coordinator.Settings.IsTrustedMonitor(m.Id)) { anyUnknown = true; break; }
+            coordinator.SetKeystrokeForced(anyUnknown);
+        }
+        shell.Monitors.MonitorsChanged += EvaluateMonitors;
+        coordinator.Settings.Changed += EvaluateMonitors; // 설정 토글·신뢰 변경 시 재평가
+        EvaluateMonitors(); // 시작 시 평가
+
         coordinator.Start();
         overlay.StartRenderLoop(
             coordinator.RenderFrame,

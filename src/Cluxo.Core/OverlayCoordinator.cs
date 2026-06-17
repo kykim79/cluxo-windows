@@ -81,6 +81,7 @@ public sealed class OverlayCoordinator : IDisposable
     private bool _shakeEnabled = true;
     private bool _scrollEnabled = true;
     private bool _keystrokeEnabled;
+    private volatile bool _keystrokeForced; // 낯선 외장 모니터 자동표시 — 설정과 별개의 임시 강제 ON
     private bool _anchoredLineEnabled;
     private bool _glowEnabled;
     private bool _idlePulseEnabled = true;
@@ -122,6 +123,9 @@ public sealed class OverlayCoordinator : IDisposable
     public bool IsInspectorActive { get { lock (_gate) return _runtime.IsInspectorActive; } }
     public bool IsRadialMenuActive { get { lock (_gate) return _runtime.IsRadialMenuActive; } }
     public bool IsSpotlightActive { get { lock (_gate) return _runtime.IsSpotlightActive; } }
+
+    /// <summary>낯선 외장 모니터 자동표시 — 키스트로크를 설정과 무관하게 임시 강제 ON/OFF(연결 시 켜고, 분리 시 원복).</summary>
+    public void SetKeystrokeForced(bool forced) => _keystrokeForced = forced;
 
     /// <summary>전체 활성 여부(트레이 토글). false면 아무 오버레이도 안 그린다(맥 비활성화 대응).</summary>
     public bool IsActive { get { lock (_gate) return _active; } }
@@ -907,8 +911,8 @@ public sealed class OverlayCoordinator : IDisposable
                     _drawing.UndoLastShape();
             }
 
-            // 키스트로크 오버레이 — 설정 ON일 때만. Format이 게이트(Ctrl/Alt/Win 필수)라 단순 타이핑은 "" 반환.
-            if (_keystrokeEnabled)
+            // 키스트로크 오버레이 — 설정 ON 또는 낯선 모니터 자동표시 강제 시. Format이 게이트(Ctrl/Alt/Win 필수).
+            if (_keystrokeEnabled || _keystrokeForced)
             {
                 string display = KeyFormat.Format(e.Modifiers, e.Special, e.Characters);
                 if (!string.IsNullOrEmpty(display))
