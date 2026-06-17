@@ -52,25 +52,22 @@ internal static class IconMaker
         var dv = new DrawingVisual();
         using (var dc = dv.RenderOpen())
         {
-            // 배경 타일 — 둥근 사각형 + 시안→블루 대각 그라디언트. 꽉 찬 컬러라 밝은/어두운 작업표시줄·
-            // 트레이 어디서나 또렷한 실루엣. (투명 링은 잘 안 보여서 교체)
+            // 배경 타일 — 검은 둥근 사각형(맥 아이콘과 동일). 꽉 찬 어두운 실루엣이라 어디서나 또렷.
             double pad = Math.Max(0.5, sz * 0.055);
             var rect = new Rect(pad, pad, sz - 2 * pad, sz - 2 * pad);
             double corner = (sz - 2 * pad) * 0.27;
-            var bg = new LinearGradientBrush(
-                Color.FromRgb(0x10, 0xC8, 0xEC), Color.FromRgb(0x16, 0x57, 0xE6),
-                new Point(0, 0), new Point(1, 1));
-            bg.Freeze();
+            var bg = new SolidColorBrush(Color.FromRgb(0x0D, 0x0D, 0x0F)); bg.Freeze();
             dc.DrawRoundedRectangle(bg, null, rect, corner, corner);
 
-            // 흰 커서 링 + 중심 점 — 컬러 타일 위에서 고대비.
-            double r = sz * 0.26;
-            double t = Math.Max(1.6, sz * 0.105);
-            var white = new SolidColorBrush(Colors.White); white.Freeze();
-            var pen = new Pen(white, t) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round };
+            // 노란(시스템 yellow) 커서 링 + 흰 중심 점 — 맥 아이콘과 동일.
+            double r = sz * 0.27;
+            double t = Math.Max(1.6, sz * 0.11);
+            var yellow = new SolidColorBrush(Color.FromRgb(255, 204, 0)); yellow.Freeze();
+            var pen = new Pen(yellow, t) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round };
             pen.Freeze();
             dc.DrawEllipse(null, pen, new Point(c, c), r, r);
-            dc.DrawEllipse(white, null, new Point(c, c), Math.Max(1.0, sz * 0.055), Math.Max(1.0, sz * 0.055));
+            var white = new SolidColorBrush(Colors.White); white.Freeze();
+            dc.DrawEllipse(white, null, new Point(c, c), Math.Max(1.0, sz * 0.06), Math.Max(1.0, sz * 0.06));
         }
 
         var rtb = new RenderTargetBitmap(size, size, 96, 96, PixelFormats.Pbgra32);
