@@ -22,7 +22,8 @@ jobs:
     env:
       PFX_B64: ${{ secrets.SIGN_PFX_BASE64 }}
       PFX_PW: ${{ secrets.SIGN_PFX_PASSWORD }}
-      VERSION: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}
+      # 주의: 환경변수 이름을 VERSION으로 두면 MSBuild가 $(Version) 속성으로 읽어 'v1.0.0'에서 빌드가 깨진다.
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}
     steps:
       - uses: actions/checkout@v4
 
@@ -51,12 +52,12 @@ jobs:
       - name: 버전명으로 산출물 이름 변경
         shell: pwsh
         run: |
-          Copy-Item publish/win-x64/Cluxo.Windows.App.exe "publish/win-x64/Cluxo-$env:VERSION-win-x64.exe"
+          Copy-Item publish/win-x64/Cluxo.Windows.App.exe "publish/win-x64/Cluxo-$env:RELEASE_TAG-win-x64.exe"
 
       - name: GitHub 릴리스 생성 + exe 첨부
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create $env:VERSION "publish/win-x64/Cluxo-$env:VERSION-win-x64.exe" `
-            --title "Cluxo $env:VERSION" --generate-notes
+          gh release create $env:RELEASE_TAG "publish/win-x64/Cluxo-$env:RELEASE_TAG-win-x64.exe" `
+            --title "Cluxo $env:RELEASE_TAG" --generate-notes
