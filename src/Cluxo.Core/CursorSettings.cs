@@ -77,6 +77,8 @@ public sealed class CursorSettings
 
     /// <summary>업데이트 소스 — GitHub "owner/repo"(releases/latest) 또는 매니페스트 JSON URL. 비면 확인 비활성.</summary>
     public string UpdateManifestUrl { get => Get("update.manifestUrl", "kykim79/cluxo-windows"); set => Set("update.manifestUrl", value); }
+    /// <summary>업데이트 자동 확인 — 시작 시 + 주기적으로 백그라운드 확인 후 새 버전이면 트레이 알림. 기본 ON.</summary>
+    public bool IsAutoUpdateCheckEnabled { get => Get("update.autoCheck", true); set => Set("update.autoCheck", value); }
 
     // ── 그리기 toolbar 위치 ──────────────────────────────────────
     public double DrawingToolbarLeading { get => Get("drawingToolbarLeading", 28.0); set => Set("drawingToolbarLeading", value); }

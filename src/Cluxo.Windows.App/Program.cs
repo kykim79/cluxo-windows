@@ -129,6 +129,9 @@ internal static class Program
 
         using var exit = new ManualResetEventSlim(false);
 
+        // 자동 업데이트 — 백그라운드 확인 결과(있으면 트레이 메뉴·알림에 노출). null이면 없음.
+        string? updateVersion = null, updateUrl = null;
+
         // T2: 마우스 후킹 분실 → 재설치됨을 트레이 풍선으로 알림.
         coordinator.MouseHookLost += () => shell.ShowTrayBalloon("Cluxo", "마우스 후킹이 재설치되었습니다.");
 
@@ -142,13 +145,17 @@ internal static class Program
                 new TrayMenuItem("lang.ko", "한국어", IsChecked: lang == PreferredLanguage.Ko),
                 new TrayMenuItem("lang.en", "English", IsChecked: lang == PreferredLanguage.En),
             };
-            return new[]
+            var items = new List<TrayMenuItem>
             {
                 new TrayMenuItem("settings", "환경설정..."),
                 new TrayMenuItem("lang", "언어", Submenu: langSub),
                 new TrayMenuItem("active", coordinator.IsActive ? "비활성화" : "활성화", IsSeparatorBefore: true),
-                new TrayMenuItem("quit", "종료", IsSeparatorBefore: true),
             };
+            // 백그라운드 확인에서 새 버전이 잡히면 업데이트 항목 노출.
+            if (updateVersion is { } uv)
+                items.Add(new TrayMenuItem("update.now", $"업데이트 설치 (v{uv})", IsSeparatorBefore: true));
+            items.Add(new TrayMenuItem("quit", "종료", IsSeparatorBefore: true));
+            return items;
         }
         shell.SetTrayMenuProvider(BuildMenu);
         shell.Tray.SetMenu(BuildMenu()); // 초기 항목(폴백)
@@ -161,6 +168,7 @@ internal static class Program
                 case "lang.ko": coordinator.Settings.PreferredLanguage = PreferredLanguage.Ko; break;
                 case "lang.en": coordinator.Settings.PreferredLanguage = PreferredLanguage.En; break;
                 case "active": coordinator.ToggleActive(); break;
+                case "update.now": if (updateUrl is { } u) _ = StartUpdate(u); break;
                 case "quit": exit.Set(); break;
             }
         };
@@ -181,6 +189,50 @@ internal static class Program
         shell.Monitors.MonitorsChanged += EvaluateMonitors;
         coordinator.Settings.Changed += EvaluateMonitors; // 설정 토글·신뢰 변경 시 재평가
         EvaluateMonitors(); // 시작 시 평가
+
+        // 자동 업데이트 확인 — 시작 직후 + 4시간마다 백그라운드 GET. 새 버전이면 트레이 풍선 1회 + 메뉴 항목 노출.
+        // 조용히 동작: 오류·네트워크 실패는 무시(팝업 없음). 설정에서 끌 수 있음(기본 ON).
+        async Task StartUpdate(string url)
+        {
+            shell.ShowTrayBalloon("Cluxo", "업데이트를 내려받는 중입니다…");
+            try
+            {
+                var path = await Update.UpdateService.DownloadInstallerAsync(url);
+                if (path is not null) { Update.UpdateService.RunInstaller(path); exit.Set(); }
+            }
+            catch (Exception ex) { shell.ShowTrayBalloon("Cluxo", "업데이트 실패: " + ex.Message); }
+        }
+
+        async Task AutoUpdateLoop()
+        {
+            await Task.Delay(TimeSpan.FromSeconds(8)); // 시작 부하·네트워크 안정 후
+            string? notifiedVersion = null;
+            while (!exit.IsSet)
+            {
+                try
+                {
+                    if (coordinator.Settings.IsAutoUpdateCheckEnabled)
+                    {
+                        var r = await Update.UpdateService.CheckAsync(coordinator.Settings.UpdateManifestUrl);
+                        if (r.Status == UpdateStatus.UpdateAvailable && !string.IsNullOrWhiteSpace(r.DownloadUrl))
+                        {
+                            updateVersion = r.LatestVersion;
+                            updateUrl = r.DownloadUrl;
+                            if (r.LatestVersion != notifiedVersion) // 같은 버전 반복 알림 방지
+                            {
+                                notifiedVersion = r.LatestVersion;
+                                shell.ShowTrayBalloon("Cluxo 업데이트",
+                                    $"새 버전 v{r.LatestVersion} 사용 가능 — 트레이 메뉴에서 설치할 수 있습니다.");
+                            }
+                        }
+                        else { updateVersion = null; updateUrl = null; }
+                    }
+                }
+                catch { /* 조용히 무시 — 다음 주기에 재시도 */ }
+                await Task.Delay(TimeSpan.FromHours(4));
+            }
+        }
+        _ = AutoUpdateLoop();
 
         coordinator.Start();
         overlay.StartRenderLoop(

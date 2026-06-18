@@ -379,6 +379,7 @@ internal sealed class SettingsWindow : Window
 
         var content = new StackPanel();
         content.Children.Add(Row("업데이트", btnRow));
+        content.Children.Add(Row("시작 시 자동 확인", Switch(s.IsAutoUpdateCheckEnabled, v => s.IsAutoUpdateCheckEnabled = v)));
         content.Children.Add(status);
 
         return new Border
