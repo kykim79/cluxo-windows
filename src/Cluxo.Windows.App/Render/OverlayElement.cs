@@ -257,12 +257,20 @@ internal sealed class OverlayElement : FrameworkElement
         double r = ring.Radius * ring.Scale * _ringSpring.Value; // 클릭 squash 스프링(§5.2)
         var c = ToLocal(cursor);
 
+        // 변환 스택 — 드래그 stretch + 원근 왜곡(Y 압축). 끝에서 pushed만큼 Pop.
+        int pushed = 0;
         // #16 드래그 속도 stretch — 진행 방향(StretchAngle)으로 회전 후 x/y 비대칭 스케일.
-        bool stretched = ring.StretchX != 1.0 || ring.StretchY != 1.0;
-        if (stretched)
+        if (ring.StretchX != 1.0 || ring.StretchY != 1.0)
         {
             dc.PushTransform(new RotateTransform(ring.StretchAngle, c.X, c.Y));
             dc.PushTransform(new ScaleTransform(ring.StretchX, ring.StretchY, c.X, c.Y));
+            pushed += 2;
+        }
+        // 원근 왜곡 — 링을 Y축으로 눕혀(0.62) 뒤로 기운 3D 원근 느낌. (맥 isPerspectiveWarping 대응)
+        if (ring.Perspective)
+        {
+            dc.PushTransform(new ScaleTransform(1.0, 0.62, c.X, c.Y));
+            pushed += 1;
         }
 
         // 글로우 — 커서 주위 은은한 후광(accent 라디얼 그라디언트). 링 외곽선 뒤에 그린다.
@@ -295,7 +303,7 @@ internal sealed class OverlayElement : FrameworkElement
         var pen = RingPen(ring.Color, ring.BorderWidth, ring.Opacity, ring.Dashed);
         dc.DrawGeometry(null, pen, RingGeometry(c, r, ring.Shape));
 
-        if (stretched) { dc.Pop(); dc.Pop(); }
+        for (int i = 0; i < pushed; i++) dc.Pop();
     }
 
     // 링/효과 공용 외형 — 원·squircle·둥근 마름모·둥근 육각형(맥 anyShape 대응). 채우기·획에 모두 사용.

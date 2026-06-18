@@ -84,6 +84,7 @@ public sealed class OverlayCoordinator : IDisposable
     private volatile bool _keystrokeForced; // 낯선 외장 모니터 자동표시 — 설정과 별개의 임시 강제 ON
     private bool _anchoredLineEnabled;
     private bool _glowEnabled;
+    private bool _perspectiveEnabled; // 원근 왜곡 — 링을 Y축으로 눕혀 3D 원근 느낌
     private bool _idlePulseEnabled = true;
     private bool _dragAngleLabelEnabled;
     private double _idleTimeout = 3.0;
@@ -386,7 +387,7 @@ public sealed class OverlayCoordinator : IDisposable
                 ? null
                 : new RingVisual(_activeColor, _ringRadius, Scale: _runtime.IsDragging ? 1.0 : _breathingScale, _ringOpacity * _ringFade,
                     _ringShape, _ringBorderWidth, _ringDashed, _glowEnabled,
-                    _hasInnerRing, _ringFillEnabled, sx, sy, sAngle);
+                    _hasInnerRing, _ringFillEnabled, sx, sy, sAngle, _perspectiveEnabled);
             // 효과는 이 모니터 영역 것만 (Mac의 per-screen 필터). TODO: 프레임당 Where/ToArray 최적화
             var effects = new OverlayEffects(
                 _effects.Clicks.Where(e => b.Contains(e.Position)).ToArray(),
@@ -561,6 +562,7 @@ public sealed class OverlayCoordinator : IDisposable
             _keystrokeEnabled = _settingsModel.IsKeystrokeEnabled;
             _anchoredLineEnabled = _settingsModel.IsAnchoredLineEnabled;
             _glowEnabled = _settingsModel.IsGlowEnabled;
+            _perspectiveEnabled = _settingsModel.IsPerspectiveWarping;
             _idlePulseEnabled = _settingsModel.IsIdlePulseEnabled;
             _breathingEnabled = _settingsModel.IsBreathingEnabled;
             _dragAngleLabelEnabled = _settingsModel.IsDragAngleLabelEnabled;
