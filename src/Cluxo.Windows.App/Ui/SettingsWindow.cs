@@ -240,13 +240,16 @@ internal sealed class SettingsWindow : Window
     private static FrameworkElement ModesTab(CursorSettings s)
     {
         var p = new StackPanel();
-        p.Children.Add(Caption("스포트라이트·돋보기는 Ctrl+Alt+S · Ctrl+Alt+M(또는 라디얼 메뉴)로 켜고 끕니다. 여기서 정한 값은 저장됩니다."));
-        p.Children.Add(Card(
+        p.Children.Add(SectionHeader("스포트라이트"));
+        p.Children.Add(WithTip(Card(
             ("반경", SliderRow(s.SpotlightRadius, 60, 250, 10, v => s.SpotlightRadius = v, v => $"{(int)v}pt")),
-            ("경계", SliderRow(s.SpotlightEdgeSoftness, 0, 1, 0.05, v => s.SpotlightEdgeSoftness = v, v => $"{(int)System.Math.Round(v * 100)}%"))));
-        p.Children.Add(Card(
+            ("경계", SliderRow(s.SpotlightEdgeSoftness, 0, 1, 0.05, v => s.SpotlightEdgeSoftness = v, v => $"{(int)System.Math.Round(v * 100)}%"))),
+            "Ctrl+Alt+S(또는 라디얼)로 켜고 끕니다. 커서 주변만 남기고 화면을 어둡게. 값은 저장됩니다."));
+        p.Children.Add(SectionHeader("돋보기"));
+        p.Children.Add(WithTip(Card(
             ("돋보기 배율", SliderRow(s.MagnifierZoom, 1.5, 4.0, 0.5, v => s.MagnifierZoom = v, v => $"{v:0.0}×")),
-            ("렌즈 크기", SliderRow(s.MagnifierSize, 120, 300, 20, v => s.MagnifierSize = v, v => $"{(int)v}pt"))));
+            ("렌즈 크기", SliderRow(s.MagnifierSize, 120, 300, 20, v => s.MagnifierSize = v, v => $"{(int)v}pt"))),
+            "Ctrl+Alt+M(또는 라디얼)로 켜고 끕니다. 커서 주변을 실시간 확대. 값은 저장됩니다."));
         return p;
     }
 
@@ -272,14 +275,16 @@ internal sealed class SettingsWindow : Window
     private static FrameworkElement GeneralTab(CursorSettings s, ILaunchAtLogin launch)
     {
         var p = new StackPanel();
-        p.Children.Add(Card(("표시 언어", SegEnum(s.PreferredLanguage, v => s.PreferredLanguage = v, v => v.Label()))));
+        p.Children.Add(WithTip(Card(("표시 언어", SegEnum(s.PreferredLanguage, v => s.PreferredLanguage = v, v => v.Label()))),
+            "변경 후 Cluxo를 재시작해야 적용됩니다."));
 
         // 시작·자동 — 로그인 + 자동 활성화 + 낯선 모니터 자동 표시 (한 카드)
-        p.Children.Add(Card(
+        p.Children.Add(SectionHeader("시작·자동"));
+        p.Children.Add(WithTip(Card(
             ("로그인 시 실행", Switch(launch.IsEnabled, v => launch.IsEnabled = v)),
             ("자동 활성화", Switch(s.IsAutoActivateEnabled, v => s.IsAutoActivateEnabled = v)),
-            ("낯선 모니터 자동표시", Switch(s.IsAutoKeystrokeOnUnknownMonitor, v => s.IsAutoKeystrokeOnUnknownMonitor = v))));
-        p.Children.Add(Caption("자동 활성화: Zoom·OBS 등 감지. 낯선 모니터: 처음 보는 외장 모니터에 키 입력 표시 ON."));
+            ("낯선 모니터 자동표시", Switch(s.IsAutoKeystrokeOnUnknownMonitor, v => s.IsAutoKeystrokeOnUnknownMonitor = v))),
+            "자동 활성화: Zoom·OBS·Teams·PowerPoint 등이 켜지면 Cluxo 자동 ON.\n낯선 모니터 자동표시: 처음 연결하는 외장 모니터(회의실 등)에 키 입력 표시 자동 ON."));
 
         // 연결된 모니터 신뢰 목록 (있을 때만 — 신뢰 ON이면 자동표시 제외)
         var monitors = Cluxo.Windows.App.Shell.MonitorIdentity.Connected();
@@ -291,15 +296,18 @@ internal sealed class SettingsWindow : Window
                 var (id, name) = monitors[i];
                 rows[i] = (name, Switch(s.IsTrustedMonitor(id), v => s.SetTrusted(id, v)));
             }
-            p.Children.Add(Card(rows));
+            p.Children.Add(SectionHeader("신뢰할 모니터 (자동표시 제외)"));
+            p.Children.Add(WithTip(Card(rows), "신뢰 ON이면 그 모니터는 낯선 모니터 자동표시에서 제외됩니다. 자주 쓰는 모니터를 등록하세요."));
         }
 
-        // 커서·캡처 — 숨김 대기 + 스크린샷 모드 (한 카드)
-        p.Children.Add(Card(
+        // 커서·화면 — 숨김 대기 + 스크린샷 모드 (한 카드)
+        p.Children.Add(SectionHeader("커서·화면"));
+        p.Children.Add(WithTip(Card(
             ("숨김 대기", SliderRow(s.RingHideSeconds, 0, 10, 0.5, v => s.RingHideSeconds = v, v => v <= 0 ? "끔" : $"{v:0.0}초")),
-            ("스크린샷 모드", Switch(s.IsScreenshotMode, v => s.IsScreenshotMode = v))));
-        p.Children.Add(Caption("숨김 대기: 안 움직이면 링이 사라지는 시간(0=항상). 스크린샷 모드: 외부 캡처에서 오버레이 제외."));
+            ("스크린샷 모드", Switch(s.IsScreenshotMode, v => s.IsScreenshotMode = v))),
+            "숨김 대기: 마우스를 안 움직이면 링이 사라지는 시간(0=항상 표시).\n스크린샷 모드: 외부 캡처(OBS·스크린샷)에서 오버레이 제외. 재시작 시 해제."));
 
+        p.Children.Add(SectionHeader("앱 정보"));
         p.Children.Add(AppInfoSection());
         p.Children.Add(UpdateSection(s));
         return p;
@@ -491,6 +499,22 @@ internal sealed class SettingsWindow : Window
         grid.Children.Add(lbl);
         grid.Children.Add(control);
         return grid;
+    }
+
+    // 소제목 — 카드 위 작은 그룹 헤더(맥 시스템 설정 섹션 라벨 느낌). 한 줄이라 공간 적게 쓰며 그룹을 명확히.
+    private static FrameworkElement SectionHeader(string text) => new TextBlock
+    {
+        Text = text, Foreground = TextMuted, FontSize = 11.5, FontWeight = FontWeights.SemiBold,
+        Margin = new Thickness(4, 4, 4, 5),
+    };
+
+    // 호버 툴팁 — 설명을 인라인 대신 마우스 올릴 때만 표시(세로 공간 절약). 카드/행에 붙인다.
+    private static T WithTip<T>(T element, string tip) where T : FrameworkElement
+    {
+        element.ToolTip = new ToolTip { Content = new TextBlock { Text = tip, TextWrapping = TextWrapping.Wrap, MaxWidth = 280, FontSize = 12 } };
+        ToolTipService.SetInitialShowDelay(element, 350);
+        ToolTipService.SetShowDuration(element, 12000);
+        return element;
     }
 
     // 박스 없는 작은 회색 캡션 — 카드 바로 아래(공간 절약). Note()의 박스형보다 압축적.
