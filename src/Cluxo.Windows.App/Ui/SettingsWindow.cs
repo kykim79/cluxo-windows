@@ -74,7 +74,7 @@ internal sealed class SettingsWindow : Window
             Content = host,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
-            MaxHeight = Math.Max(360, SystemParameters.WorkArea.Height - 170),
+            MaxHeight = Math.Max(360, SystemParameters.WorkArea.Height - 100),
         });
         return root;
     }
@@ -240,7 +240,7 @@ internal sealed class SettingsWindow : Window
     private static FrameworkElement ModesTab(CursorSettings s)
     {
         var p = new StackPanel();
-        p.Children.Add(Note("값은 저장됩니다. 화면 렌더(스포트라이트 디밍·돋보기 확대)는 준비 중 — 토글은 라디얼/단축키(⌃⌥S·⌃⌥M)."));
+        p.Children.Add(Caption("스포트라이트·돋보기는 Ctrl+Alt+S · Ctrl+Alt+M(또는 라디얼 메뉴)로 켜고 끕니다. 여기서 정한 값은 저장됩니다."));
         p.Children.Add(Card(
             ("반경", SliderRow(s.SpotlightRadius, 60, 250, 10, v => s.SpotlightRadius = v, v => $"{(int)v}pt")),
             ("경계", SliderRow(s.SpotlightEdgeSoftness, 0, 1, 0.05, v => s.SpotlightEdgeSoftness = v, v => $"{(int)System.Math.Round(v * 100)}%"))));
