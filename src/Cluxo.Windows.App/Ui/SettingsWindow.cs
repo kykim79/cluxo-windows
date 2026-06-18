@@ -482,15 +482,15 @@ internal sealed class SettingsWindow : Window
         return new Border
         {
             Background = CardBg, BorderBrush = CardBorder, BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(10), Padding = new Thickness(14, 3, 14, 3),
-            Child = stack, Margin = new Thickness(0, 0, 0, 12),
+            CornerRadius = new CornerRadius(10), Padding = new Thickness(14, 2, 14, 2),
+            Child = stack, Margin = new Thickness(0, 0, 0, 8),
         };
     }
 
     // 라벨(좌) + 컨트롤(우). 맥 시스템 설정 행 스타일 — 세로 공간 절약.
     private static FrameworkElement Row(string label, FrameworkElement control)
     {
-        var grid = new Grid { Margin = new Thickness(0, 10, 0, 10) };
+        var grid = new Grid { Margin = new Thickness(0, 7, 0, 7) };
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(92) });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         var lbl = new TextBlock { Text = label, VerticalAlignment = VerticalAlignment.Center, Foreground = TextPrimary, FontSize = 13, TextTrimming = TextTrimming.CharacterEllipsis };
@@ -505,7 +505,7 @@ internal sealed class SettingsWindow : Window
     private static FrameworkElement SectionHeader(string text) => new TextBlock
     {
         Text = text, Foreground = TextMuted, FontSize = 11.5, FontWeight = FontWeights.SemiBold,
-        Margin = new Thickness(4, 4, 4, 5),
+        Margin = new Thickness(4, 3, 4, 3),
     };
 
     // 호버 툴팁 — 설명을 인라인 대신 마우스 올릴 때만 표시(세로 공간 절약). 카드/행에 붙인다.
