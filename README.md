@@ -4,7 +4,11 @@
 
 커서 둘레에 강조 링을 그리고, 클릭·스크롤·드래그에 시각 효과를 더하며, 스포트라이트·돋보기·키 입력 표시·화면 주석(그리기) 등 발표에 필요한 기능을 트레이에서 조용히 제공합니다.
 
+> 🍎 **macOS 사용자라면** → [**Cluxo (macOS)**](https://github.com/kykim79/Cluxo) (원본)
+>
 > 상태: 활발히 개발 중. 최신 빌드는 [Releases](https://github.com/kykim79/cluxo-windows/releases)에서 받을 수 있습니다.
+
+<a href="https://www.producthunt.com/products/cluxo?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-cluxo" target="_blank" rel="noopener noreferrer"><img alt="Cluxo - Highlight your cursor for screencasts and demos | Product Hunt" width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1165711&amp;theme=light"></a>
 
 ## 주요 기능
 
